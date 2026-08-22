@@ -1,0 +1,1806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Task Tracking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  :root{
+    --paper-dark:#0a141f;
+    --paper-dark-2:#060c14;
+    --paper:#e6ebf0;
+    --paper-light:#f6f8fa;
+    --ink:#16212c;
+    --ink-soft:#57697a;
+    --brass:#2f8fd1;
+    --brass-light:#5fb0e8;
+    --stamp-red:#d1552f;
+    --stamp-teal:#22a878;
+    --line:#c7d2da;
+    --page-text:#f6f8fa;
+    --page-text-soft:#5fb0e8;
+  }
+  body.light-theme{
+    --paper-dark:#eef2f6;
+    --paper:#ffffff;
+    --paper-light:#ffffff;
+    --page-text:#16212c;
+    --page-text-soft:#1f6ea8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper-dark);
+    background-image:
+      radial-gradient(ellipse at top left, rgba(95,176,232,0.06), transparent 60%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 32px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 1px, transparent 1px, transparent 32px);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    padding:28px 20px 80px;
+    transition:background-color .15s ease;
+  }
+  body.light-theme{
+    background-image:
+      radial-gradient(ellipse at top left, rgba(47,143,209,0.07), transparent 60%),
+      repeating-linear-gradient(0deg, rgba(10,20,31,0.035) 0px, rgba(10,20,31,0.035) 1px, transparent 1px, transparent 32px),
+      repeating-linear-gradient(90deg, rgba(10,20,31,0.035) 0px, rgba(10,20,31,0.035) 1px, transparent 1px, transparent 32px);
+  }
+  h1,h2,h3,.type-face{font-family:'Space Grotesk', sans-serif; letter-spacing:0.2px; font-weight:700;}
+  .mono{font-family:'JetBrains Mono', monospace;}
+
+  header{max-width:1040px;margin:0 auto 22px;color:var(--page-text);}
+  .masthead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:2px solid var(--brass);padding-bottom:14px;justify-content:space-between;}
+  .masthead-left{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+  .masthead h1{font-size:28px;margin:0;color:var(--page-text);}
+  .masthead .sub{font-family:'JetBrains Mono';font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--page-text-soft);}
+  .header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .search-input{background:var(--paper-light);border:1px solid var(--brass);border-radius:3px;padding:8px 12px;font-family:'JetBrains Mono';font-size:12px;color:var(--ink);width:260px;max-width:100%;}
+  .search-input::placeholder{color:var(--ink-soft);}
+  .theme-toggle{background:transparent;border:1px solid var(--brass);color:var(--page-text-soft);padding:8px 12px;border-radius:3px;font-size:14px;line-height:1;}
+  .theme-toggle:hover{background:rgba(47,143,209,0.15);}
+  .bin-btn{background:transparent;border:1px solid var(--brass);color:var(--page-text-soft);padding:8px 14px;border-radius:3px;font-size:12px;letter-spacing:0.5px;}
+  .bin-btn:hover{background:rgba(47,143,209,0.15);}
+  .bin-btn .badge{background:var(--stamp-red);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:6px;}
+
+  .save-badge{font-family:'JetBrains Mono';font-size:10.5px;padding:5px 10px;border-radius:3px;display:none;align-items:center;gap:8px;}
+  .save-badge.saving{display:inline-flex;color:var(--page-text-soft);opacity:0.85;}
+  .save-badge.error{display:inline-flex;color:#e08a7d;border:1px solid #8a3f22;background:rgba(209,85,47,0.18);}
+  body.light-theme .save-badge.error{color:#b23a1f;border:1px solid #d1552f;background:rgba(209,85,47,0.12);}
+  .save-badge button{background:transparent;border:1px solid #e08a7d;color:#e08a7d;font-size:10px;padding:2px 7px;border-radius:2px;}
+  body.light-theme .save-badge button{border-color:#b23a1f;color:#b23a1f;}
+  .save-badge button:hover{background:rgba(224,138,125,0.15);}
+
+  .breadcrumb{max-width:1040px;margin:16px auto 0;display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-family:'JetBrains Mono';font-size:12.5px;color:var(--page-text);}
+  .breadcrumb .crumb{cursor:pointer;padding:4px 9px;border:1px solid var(--brass);border-radius:3px;background:rgba(47,143,209,0.12);}
+  .breadcrumb .crumb:hover{background:rgba(47,143,209,0.3);}
+  .breadcrumb .crumb.current{background:var(--brass);color:var(--paper-dark-2);font-weight:600;}
+  .breadcrumb .sep{color:var(--page-text-soft);opacity:0.6;}
+
+  main{max-width:1040px;margin:26px auto 0;}
+
+  .section-title{display:flex;align-items:center;justify-content:space-between;margin:30px 0 12px;flex-wrap:wrap;gap:8px;}
+  .section-title h2{font-size:15px;color:var(--page-text);margin:0;text-transform:uppercase;letter-spacing:1.5px;}
+  .collapsible-title{cursor:pointer;display:flex;align-items:center;gap:7px;user-select:none;}
+  .collapsible-title:hover{opacity:0.8;}
+  .chevron{display:inline-block;font-size:11px;transition:transform .15s ease;transform:rotate(0deg);}
+  .chevron.collapsed{transform:rotate(-90deg);}
+
+  button{cursor:pointer;font-family:'JetBrains Mono';border:none;}
+  .btn{background:var(--brass);color:var(--paper-dark-2);font-weight:600;font-size:12px;padding:8px 14px;border-radius:3px;border:1px solid var(--brass-light);letter-spacing:0.5px;}
+  .btn:hover{background:var(--brass-light);}
+  .btn.ghost{background:transparent;color:var(--brass-light);border:1px solid var(--brass);}
+  .btn.ghost:hover{background:rgba(47,143,209,0.15);}
+  .btn.small{padding:5px 10px;font-size:11px;}
+  .btn.danger{background:transparent;color:#c66a5c;border:1px solid #7a382e;}
+  .btn.danger:hover{background:rgba(209,85,47,0.15);}
+  .btn.subtle{background:transparent;color:var(--ink-soft);border:1px solid var(--line);}
+  .btn.subtle:hover{background:rgba(0,0,0,0.05);}
+
+  .empty-note{color:var(--brass-light);font-family:'JetBrains Mono';font-size:12px;padding:18px 4px;opacity:0.8;font-style:italic;}
+  main .empty-note{color:var(--ink-soft);}
+
+  /* Date range tracker */
+  .range-controls{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:16px;align-items:flex-end;}
+  .range-controls > div{display:flex;flex-direction:column;gap:5px;}
+  .range-controls span{font-family:'JetBrains Mono';font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--page-text-soft);}
+  .range-controls input{padding:7px 9px;border:1px solid var(--brass);border-radius:3px;background:var(--paper-light);font-family:'JetBrains Mono';font-size:12.5px;color:var(--ink);}
+  .range-controls .reset-btn{align-self:flex-end;}
+  .day-toggle{display:flex;gap:4px;}
+  .day-toggle button{width:32px;height:32px;border:1px solid var(--brass);background:var(--paper-light);color:var(--ink);border-radius:3px;font-family:'JetBrains Mono';font-size:12px;}
+  .day-toggle button.active{background:var(--brass);color:var(--paper-dark-2);font-weight:600;}
+  .day-toggle button:hover{background:rgba(47,143,209,0.2);}
+
+  .list-controls{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;align-items:flex-end;}
+  .list-controls > div{display:flex;flex-direction:column;gap:5px;}
+  .list-controls span{font-family:'JetBrains Mono';font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--page-text-soft);}
+  .list-controls select{padding:7px 9px;border:1px solid var(--brass);border-radius:3px;background:var(--paper-light);font-family:'JetBrains Mono';font-size:12px;color:var(--ink);}
+
+  /* Folder tabs (categories) */
+  .folder-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:26px 18px;}
+  .folder-tab{position:relative;background:var(--paper);border:1px solid var(--line);border-top:3px solid var(--brass);border-radius:6px;padding:18px 16px 16px;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease;box-shadow:0 2px 8px rgba(0,0,0,0.28);}
+  .folder-tab::before{content:'';position:absolute;top:10px;right:10px;width:7px;height:7px;border-radius:50%;background:var(--brass);opacity:0.55;}
+  .folder-tab:hover{transform:translateY(-3px);box-shadow:0 8px 18px rgba(0,0,0,0.35);}
+  .folder-tab h3{margin:0 0 4px;font-size:15px;color:var(--ink);word-break:break-word;}
+  .folder-tab .meta{font-family:'JetBrains Mono';font-size:10.5px;color:var(--ink-soft);}
+  .folder-tab .tab-actions{position:absolute;top:6px;right:6px;display:flex;gap:2px;opacity:0;transition:opacity .12s;}
+  .folder-tab:hover .tab-actions{opacity:0.85;}
+  .folder-tab .tab-actions button{background:transparent;color:var(--ink-soft);font-size:12px;padding:3px 5px;}
+  .folder-tab .tab-actions button:hover{color:var(--stamp-red);}
+  .folder-tab .tooltip{display:none;position:absolute;left:0;top:calc(100% + 8px);z-index:5;width:230px;background:var(--paper-light);border:1px solid var(--brass);border-radius:4px;padding:10px 12px;font-size:12.5px;color:var(--ink);box-shadow:0 4px 14px rgba(0,0,0,0.4);}
+  .folder-tab:hover .tooltip{display:block;}
+  .folder-tab .tooltip::before{content:'description';display:block;font-family:'JetBrains Mono';font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--brass);margin-bottom:4px;}
+
+  /* Task / node cards */
+  .task-list{display:flex;flex-direction:column;gap:12px;}
+  .task-card{background:var(--paper-light);border:1px solid var(--line);border-left:4px solid var(--stamp-red);border-radius:6px;padding:14px 16px;position:relative;box-shadow:0 2px 6px rgba(0,0,0,0.22);}
+  .task-card.overdue{border-left-color:#b23a1f;box-shadow:0 0 0 1px rgba(178,58,31,0.35), 0 2px 6px rgba(0,0,0,0.22);}
+  .tag.overdue-tag{border-color:#b23a1f;color:#b23a1f;}
+  .tag.waiting-tag{border-color:#8860c4;color:#8860c4;}
+  .waiting-note{margin:0 0 10px;padding:8px 10px;background:rgba(136,96,196,0.08);border-left:3px solid #8860c4;border-radius:2px;font-size:13px;color:var(--ink);}
+  .waiting-note strong{color:#8860c4;font-family:'JetBrains Mono';font-size:10px;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:3px;}
+  .drag-handle{cursor:grab;color:var(--ink-soft);font-size:14px;padding:2px 2px 2px 0;user-select:none;flex-shrink:0;align-self:center;}
+  .drag-handle:active{cursor:grabbing;}
+  .tag-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;}
+  .tag-chip{font-family:'JetBrains Mono';font-size:9.5px;color:var(--brass);background:rgba(47,143,209,0.1);border:1px solid var(--brass);border-radius:10px;padding:1px 8px;}
+  .task-card.ongoing{border-left-color:var(--stamp-teal);}
+  .task-card.completed{opacity:0.62;}
+  .task-top{display:flex;align-items:flex-start;gap:14px;}
+  .task-main{flex:1;min-width:0;cursor:pointer;}
+  .task-title-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .task-title{font-size:15.5px;font-weight:600;color:var(--ink);}
+  .task-card.completed .task-title{text-decoration:line-through;}
+  .tag{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border-radius:2px;border:1px solid var(--stamp-red);color:var(--stamp-red);}
+  .tag.ongoing{border-color:var(--stamp-teal);color:var(--stamp-teal);}
+  .task-meta{font-family:'JetBrains Mono';font-size:11px;color:var(--ink-soft);margin-top:4px;display:flex;gap:14px;flex-wrap:wrap;align-items:center;}
+
+  .subdash-row{display:flex;align-items:center;gap:4px;}
+  .subdash-marks{display:flex;gap:2px;}
+  .subdash{width:12px;height:4px;border-radius:2px;background:transparent;border:1px solid var(--stamp-red);}
+  .subdash.filled{background:var(--stamp-red);}
+  .task-card.ongoing .subdash{border-color:var(--stamp-teal);}
+  .task-card.ongoing .subdash.filled{background:var(--stamp-teal);}
+
+  .stamp-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:52px;}
+  .stamp-num{width:38px;height:38px;border-radius:50%;border:2px solid var(--stamp-red);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono';font-weight:600;font-size:14px;color:var(--stamp-red);}
+  .task-card.ongoing .stamp-num{border-color:var(--stamp-teal);color:var(--stamp-teal);}
+  .dots{display:flex;gap:2px;}
+  .dot{width:5px;height:5px;border-radius:50%;background:var(--line);}
+  .dot.filled{background:var(--stamp-red);}
+  .task-card.ongoing .dot.filled{background:var(--stamp-teal);}
+
+  .complete-stamp{position:absolute;top:10px;right:14px;font-family:'JetBrains Mono';font-weight:600;color:var(--stamp-teal);border:1px solid var(--stamp-teal);background:rgba(34,168,120,0.1);padding:2px 9px;border-radius:12px;font-size:10px;letter-spacing:1px;pointer-events:none;}
+
+  .task-detail{margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);font-size:13.5px;color:var(--ink);}
+  .task-detail p{margin:0 0 10px;line-height:1.5;}
+  .task-detail .row{display:flex;flex-wrap:wrap;gap:8px 24px;font-family:'JetBrains Mono';font-size:11.5px;color:var(--ink-soft);margin-bottom:12px;}
+  .task-detail .row div span{display:block;color:var(--brass);text-transform:uppercase;letter-spacing:1px;font-size:9.5px;margin-bottom:2px;}
+  .task-detail-actions{display:flex;gap:8px;margin-bottom:6px;flex-wrap:wrap;}
+
+  /* Nested children get progressively more compact */
+  .children-list{margin-top:12px;padding-left:16px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:10px;}
+  .children-list .task-card{padding:10px 12px;}
+  .children-list .task-title{font-size:13.5px;}
+  .children-list .stamp-num{width:30px;height:30px;font-size:11px;}
+  .children-list .task-meta{font-size:10px;}
+  .children-list .children-list{padding-left:14px;}
+
+  /* Modal */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,12,8,0.72);z-index:50;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--paper-light);border:1px solid var(--brass);border-radius:4px;max-width:460px;width:100%;padding:24px;box-shadow:4px 8px 30px rgba(0,0,0,0.5);}
+  .modal h2{margin:0 0 4px;font-size:17px;}
+  .modal .modal-sub{font-family:'JetBrains Mono';font-size:11px;color:var(--ink-soft);margin-bottom:18px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-family:'JetBrains Mono';font-size:10.5px;text-transform:uppercase;letter-spacing:1px;color:var(--brass);margin-bottom:5px;}
+  .field input, .field textarea, .field select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:2px;background:#fffdf7;font-family:'Inter';font-size:13.5px;color:var(--ink);}
+  .field textarea{resize:vertical;min-height:60px;font-family:'Inter';}
+  .type-toggle{display:flex;gap:8px;margin-bottom:16px;}
+  .type-toggle button{flex:1;padding:10px;border:1px solid var(--line);background:#fffdf7;border-radius:3px;font-size:11.5px;color:var(--ink-soft);}
+  .type-toggle button.active{border-color:var(--stamp-red);color:var(--stamp-red);background:rgba(209,85,47,0.08);font-weight:600;}
+  .type-toggle button.active.ongoing-active{border-color:var(--stamp-teal);color:var(--stamp-teal);background:rgba(34,168,120,0.08);}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+  .field label.checkbox-label{display:flex;align-items:flex-start;gap:8px;font-family:'Inter';font-size:13px;color:var(--ink);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:400;}
+  .checkbox-label input{width:auto;margin-top:2px;}
+
+  /* Recycling bin */
+  .trash-list{display:flex;flex-direction:column;gap:10px;}
+  .trash-item{background:var(--paper-light);border:1px solid var(--line);border-left:4px solid var(--ink-soft);border-radius:2px;padding:12px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .trash-item .ti-main{flex:1;min-width:180px;}
+  .trash-item .ti-title{font-size:14px;font-weight:600;}
+  .trash-item .ti-meta{font-family:'JetBrains Mono';font-size:10.5px;color:var(--ink-soft);margin-top:3px;}
+  .trash-item .ti-kind{font-family:'JetBrains Mono';font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:var(--brass);border:1px solid var(--brass);padding:2px 6px;border-radius:2px;margin-right:8px;}
+  .trash-item .ti-actions{display:flex;gap:8px;}
+
+  /* Auth gate */
+  .auth-gate{position:fixed;inset:0;z-index:200;background:var(--paper-dark);display:flex;align-items:center;justify-content:center;padding:20px;}
+  .auth-box{background:var(--paper-light);border:1px solid var(--brass);border-radius:6px;padding:40px 36px;max-width:380px;width:100%;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,0.45);}
+  .auth-box h1{font-size:22px;margin:0 0 10px;color:var(--ink);}
+  .auth-box p{font-family:'Inter';font-size:13.5px;color:var(--ink-soft);margin:0 0 24px;line-height:1.5;}
+  .auth-btn{background:var(--brass);color:var(--paper-dark-2);font-family:'Space Grotesk';font-weight:700;font-size:14px;padding:12px 26px;border-radius:4px;border:1px solid var(--brass-light);cursor:pointer;}
+  .auth-btn:hover{background:var(--brass-light);}
+  .auth-status{margin-top:16px;font-family:'JetBrains Mono';font-size:11px;color:var(--ink-soft);min-height:16px;}
+  .auth-status.error{color:#e08a7d;}
+  .sign-out-btn{background:transparent;border:1px solid var(--brass);color:var(--page-text-soft);padding:8px 12px;border-radius:3px;font-size:11px;font-family:'JetBrains Mono';}
+  .sign-out-btn:hover{background:rgba(47,143,209,0.15);}
+
+  @media (max-width:520px){
+    .folder-grid{grid-template-columns:1fr 1fr;}
+    .task-top{flex-wrap:wrap;}
+    .masthead{flex-direction:column;align-items:flex-start;}
+  }
+</style>
+</head>
+<body>
+
+<div class="auth-gate" id="authGate">
+  <div class="auth-box">
+    <h1>🎯 Task Tracking</h1>
+    <p id="authGateText">Signing you in with Google…</p>
+    <button class="auth-btn" id="signInBtn" style="display:none" onclick="signIn()">Sign in with Google</button>
+    <div class="auth-status" id="authStatus"></div>
+  </div>
+</div>
+
+<header>
+  <div class="masthead">
+    <div class="masthead-left">
+      <h1>🎯 Task Tracking</h1>
+    </div>
+    <div class="header-actions">
+      <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search tasks, sub-tasks, categories… ( / )" oninput="updateSearchQuery(this.value)">
+      <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Switch theme"></button>
+      <input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(event)">
+      <button class="bin-btn" onclick="document.getElementById('importFileInput').click()" title="Restore from a JSON backup">⬆ Import</button>
+      <button class="bin-btn" onclick="exportData()" title="Download a JSON backup">⬇ Export</button>
+      <button class="bin-btn" onclick="openTrashView()">🗑 Recycling Bin<span class="badge" id="trashBadge" style="display:none">0</span></button>
+      <button class="sign-out-btn" onclick="signOut()" title="Sign out of Google">Sign Out</button>
+    </div>
+  </div>
+  <div id="saveBadge" class="save-badge"></div>
+  <div class="breadcrumb" id="breadcrumb"></div>
+</header>
+
+<main id="main"></main>
+
+<!-- Category Modal -->
+<div class="modal-overlay" id="categoryModalOverlay">
+  <div class="modal">
+    <h2 id="catModalTitle">New Category</h2>
+    <div class="modal-sub">A category or sub-category to file things under.</div>
+    <div class="field"><label>Name</label><input id="catName" type="text" placeholder="e.g. Household, Q3 Project, Health"></div>
+    <div class="field"><label>Description</label><textarea id="catDesc" placeholder="A short note on what belongs here — shown on hover"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal('categoryModalOverlay')">Cancel</button>
+      <button class="btn" id="catModalSubmitBtn" onclick="submitCategory()">Add Category</button>
+    </div>
+  </div>
+</div>
+
+<!-- Node (Task / Sub-task) Modal — shared by create & edit, top-level & nested -->
+<div class="modal-overlay" id="nodeModalOverlay">
+  <div class="modal">
+    <h2 id="nodeModalTitle">New Task</h2>
+    <div class="modal-sub" id="nodeModalSub">Log a new item.</div>
+    <div class="type-toggle">
+      <button id="typeDobyBtn" onclick="setNodeType('doby')">📌 Do-By</button>
+      <button id="typeOngoingBtn" onclick="setNodeType('ongoing')">♻️ Ongoing</button>
+    </div>
+    <div class="field"><label>Title</label><input id="nodeTitle" type="text" placeholder="What needs doing"></div>
+    <div class="field"><label>Description</label><textarea id="nodeDesc" placeholder="Details, context, notes"></textarea></div>
+    <div class="field" id="nodeDeadlineField"><label>Deadline</label><input id="nodeDeadline" type="datetime-local"></div>
+    <div class="field" id="nodePeriodField" style="display:none">
+      <label>Task Period</label>
+      <div style="display:flex;gap:10px;">
+        <div style="flex:1;"><div class="mono" style="font-size:10px;color:var(--ink-soft);margin-bottom:4px;">Start Date</div><input id="nodePeriodStart" type="date"></div>
+        <div style="flex:1;"><div class="mono" style="font-size:10px;color:var(--ink-soft);margin-bottom:4px;">End Date</div><input id="nodePeriodEnd" type="date"></div>
+      </div>
+    </div>
+    <div class="field" id="nodeRecurringField" style="display:none">
+      <label class="checkbox-label"><input type="checkbox" id="nodeRecurring"> Repeat automatically — when this period ends, a new occurrence of the same length is created</label>
+    </div>
+    <div class="field"><label>Estimated Time Required</label><input id="nodeEstTime" type="text" placeholder="e.g. 2 hours, 3 days"></div>
+    <div class="field">
+      <label>Importance (1 – 7)</label>
+      <select id="nodeImportance">
+        <option value="1">1 — Low</option><option value="2">2</option><option value="3">3</option>
+        <option value="4">4 — Moderate</option><option value="5">5</option><option value="6">6</option>
+        <option value="7">7 — Critical</option>
+      </select>
+    </div>
+    <div class="field"><label>Tags</label><input id="nodeTags" type="text" placeholder="comma separated, e.g. finance, urgent"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal('nodeModalOverlay')">Cancel</button>
+      <button class="btn" id="nodeModalSubmitBtn" onclick="submitNodeModal()">Add Task</button>
+    </div>
+  </div>
+</div>
+
+<!-- Waiting Justification Modal -->
+<div class="modal-overlay" id="waitingModalOverlay">
+  <div class="modal">
+    <h2>Mark as Waiting</h2>
+    <div class="modal-sub">A short note on what this is blocked on.</div>
+    <div class="field"><label>Justification</label><textarea id="waitingJustification" placeholder="What's it waiting on, and from whom?"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal('waitingModalOverlay')">Cancel</button>
+      <button class="btn" onclick="submitWaitingJustification()">Mark as Waiting</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------------
+// STATE
+// ---------------------------------------------------------------------
+let state = { categories: {}, tasks: {}, trash: [], theme: 'dark', nextXDays: 3, collapsedSections: {} };
+let currentCategoryId = null;   // null = root/home
+let viewMode = 'browse';        // 'browse' | 'trash'
+let searchQuery = '';
+let expandedNodes = new Set();  // keys: `${taskId}|${pathIds.join(',')}`
+let pendingNodeType = 'doby';
+let modalCtx = null;            // {mode:'create-task'|'create-child'|'edit', categoryId?, taskId?, parentPathIds?, pathIds?}
+let waitingModalCtx = null;     // {taskId, pathIds}
+let categoryEditId = null;      // set when category modal is in edit mode
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+function todayStr(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function addDaysStr(dateStr, n){
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+let rangeStart = todayStr();
+let rangeEnd = addDaysStr(rangeStart, 7);
+let nextXDays = 3;
+function updateNextXDays(n){ nextXDays = n; state.nextXDays = n; saveState(); render(); }
+
+// ---------------------------------------------------------------------
+// COLLAPSIBLE SECTIONS (every section except Categories/Sub-Categories)
+// ---------------------------------------------------------------------
+function isSectionCollapsed(key){ return !!state.collapsedSections[key]; }
+function toggleSectionCollapse(key){
+  state.collapsedSections[key] = !state.collapsedSections[key];
+  saveState(); render();
+}
+function sectionHeader(key, title, actionsHtml){
+  const collapsed = isSectionCollapsed(key);
+  return `<div class="section-title">
+      <h2 class="collapsible-title" onclick="toggleSectionCollapse('${key}')">
+        <span class="chevron ${collapsed?'collapsed':''}">▾</span> ${title}
+      </h2>
+      ${actionsHtml || ''}
+    </div>`;
+}
+
+// Sort + filter state, kept independently per section.
+let sectionControls = {
+  overdue:  { sort: 'date', type: 'all', status: 'all' },
+  nextx:    { sort: 'date', type: 'all', status: 'all' },
+  nextweek: { sort: 'date', type: 'all', status: 'all' },
+  range:    { sort: 'date', type: 'all', status: 'all' }
+};
+function updateSectionControl(key, field, value){
+  sectionControls[key][field] = value;
+  render();
+}
+function applySortFilter(results, ctrl){
+  let filtered = results.filter(r => {
+    if(ctrl.type !== 'all' && r.node.type !== ctrl.type) return false;
+    if(ctrl.status === 'active' && r.node.completed) return false;
+    if(ctrl.status === 'completed' && !r.node.completed) return false;
+    return true;
+  });
+  const catLabel = (r) => {
+    const t = state.tasks[r.taskId];
+    return t ? categoryPath(t.categoryId).map(c => c.name).join(' / ') : '';
+  };
+  const sorters = {
+    date: (a,b) => String(a.sortDate).localeCompare(String(b.sortDate)) || (b.node.importance - a.node.importance),
+    importance: (a,b) => (b.node.importance - a.node.importance) || String(a.sortDate).localeCompare(String(b.sortDate)),
+    title: (a,b) => a.node.title.localeCompare(b.node.title),
+    category: (a,b) => catLabel(a).localeCompare(catLabel(b)) || String(a.sortDate).localeCompare(String(b.sortDate))
+  };
+  filtered.sort(sorters[ctrl.sort] || sorters.date);
+  return filtered;
+}
+function renderListControls(key){
+  const c = sectionControls[key];
+  return `<div class="list-controls">
+      <div><span>Sort by</span>
+        <select onchange="updateSectionControl('${key}','sort',this.value)">
+          <option value="date" ${c.sort==='date'?'selected':''}>Date</option>
+          <option value="importance" ${c.sort==='importance'?'selected':''}>Importance</option>
+          <option value="title" ${c.sort==='title'?'selected':''}>Title (A–Z)</option>
+          <option value="category" ${c.sort==='category'?'selected':''}>Category</option>
+        </select>
+      </div>
+      <div><span>Type</span>
+        <select onchange="updateSectionControl('${key}','type',this.value)">
+          <option value="all" ${c.type==='all'?'selected':''}>All</option>
+          <option value="doby" ${c.type==='doby'?'selected':''}>Do-By</option>
+          <option value="ongoing" ${c.type==='ongoing'?'selected':''}>Ongoing</option>
+        </select>
+      </div>
+      <div><span>Status</span>
+        <select onchange="updateSectionControl('${key}','status',this.value)">
+          <option value="all" ${c.status==='all'?'selected':''}>All</option>
+          <option value="active" ${c.status==='active'?'selected':''}>Active</option>
+          <option value="completed" ${c.status==='completed'?'selected':''}>Completed</option>
+        </select>
+      </div>
+    </div>`;
+}
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
+
+// ---------------------------------------------------------------------
+// GOOGLE DRIVE AUTH + PERSISTENCE
+// ---------------------------------------------------------------------
+const GOOGLE_CLIENT_ID = '210912226684-l0btp1egeoakjn4ujm7flkq7nj5jsak2.apps.googleusercontent.com';
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+const DRIVE_FILE_NAME = 'task-tracking-data.json';
+const DRIVE_FOLDER_NAME = 'Task Tracker';
+
+let driveFolderId = null;
+let tokenClient = null;
+let driveAccessToken = null;
+let driveFileId = null;
+let appStarted = false;
+let silentAttemptDone = false;
+
+function waitForGoogleIdentity(cb, attempts){
+  attempts = attempts || 0;
+  if(window.google && google.accounts && google.accounts.oauth2){ cb(); }
+  else if(attempts < 50){ setTimeout(() => waitForGoogleIdentity(cb, attempts + 1), 100); }
+  else {
+    setAuthStatus('Could not load Google Sign-In. Check your connection and reload.', true);
+    revealSignInButton();
+  }
+}
+function initGoogleAuth(){
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: DRIVE_SCOPE,
+    callback: (tokenResponse) => {
+      if(tokenResponse && tokenResponse.access_token){
+        driveAccessToken = tokenResponse.access_token;
+        setAuthStatus('');
+        onSignedIn();
+      } else {
+        handleAuthAttemptFailed();
+      }
+    },
+    error_callback: (err) => {
+      console.log('Google auth attempt did not complete:', err);
+      handleAuthAttemptFailed();
+    }
+  });
+  // Try to sign in automatically, with no visible popup or click, using
+  // whatever Google session/consent already exists in this browser. This
+  // succeeds silently on a returning device; on a brand-new device or the
+  // very first use, it fails fast and we fall back to a manual button.
+  setAuthStatus('Signing you in…');
+  tokenClient.requestAccessToken({ prompt: '' });
+}
+function handleAuthAttemptFailed(){
+  if(!silentAttemptDone){
+    // The automatic attempt failed — this is expected the first time a
+    // browser is used, since Google requires one explicit click before it
+    // will grant access. Show the button so that click can happen.
+    silentAttemptDone = true;
+    setAuthStatus('');
+    revealSignInButton();
+  } else {
+    setAuthStatus('Sign-in failed or was cancelled. Please try again.', true);
+  }
+}
+function revealSignInButton(){
+  const btn = document.getElementById('signInBtn');
+  const text = document.getElementById('authGateText');
+  if(btn) btn.style.display = 'inline-block';
+  if(text) text.textContent = 'Sign in with Google to load and sync your tasks via Google Drive.';
+}
+function setAuthStatus(msg, isError){
+  const el = document.getElementById('authStatus');
+  if(!el) return;
+  el.textContent = msg || '';
+  el.className = 'auth-status' + (isError ? ' error' : '');
+}
+function signIn(){
+  if(!tokenClient){ setAuthStatus('Still loading Google Sign-In — try again in a moment.', true); return; }
+  silentAttemptDone = true; // a manual click's failure should show the real error, not silently fall back again
+  setAuthStatus('Opening Google sign-in…');
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+function signOut(){
+  if(driveAccessToken && window.google && google.accounts && google.accounts.oauth2){
+    try{ google.accounts.oauth2.revoke(driveAccessToken, () => {}); }catch(e){}
+  }
+  driveAccessToken = null;
+  driveFileId = null;
+  driveFolderId = null;
+  appStarted = false;
+  silentAttemptDone = true; // after an explicit sign-out, don't auto-retry silently — wait for a click
+  document.getElementById('authGate').style.display = 'flex';
+  revealSignInButton();
+  setAuthStatus('');
+}
+function onSignedIn(){
+  if(appStarted) return;
+  appStarted = true;
+  document.getElementById('authGate').style.display = 'none';
+  loadState();
+}
+
+// Wraps fetch with the current access token, and transparently retries
+// once via a silent token refresh if the token has expired (401).
+async function driveFetch(url, options){
+  options = options || {};
+  options.headers = Object.assign({}, options.headers, { Authorization: `Bearer ${driveAccessToken}` });
+  let res = await fetch(url, options);
+  if(res.status === 401){
+    await refreshDriveToken();
+    options.headers.Authorization = `Bearer ${driveAccessToken}`;
+    res = await fetch(url, options);
+  }
+  return res;
+}
+function refreshDriveToken(){
+  return new Promise((resolve, reject) => {
+    if(!tokenClient){ reject(new Error('No token client')); return; }
+    const prevCallback = tokenClient.callback;
+    tokenClient.callback = (resp) => {
+      tokenClient.callback = prevCallback;
+      if(resp && resp.access_token){ driveAccessToken = resp.access_token; resolve(); }
+      else reject(new Error('Silent token refresh failed'));
+    };
+    tokenClient.requestAccessToken({ prompt: '' });
+  });
+}
+async function driveFindOrCreateFolder(){
+  const q = encodeURIComponent(`name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const res = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`);
+  if(!res.ok) throw new Error('Drive folder search failed: ' + res.status);
+  const data = await res.json();
+  if(data.files && data.files[0]) return data.files[0].id;
+
+  const createRes = await driveFetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: DRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' })
+  });
+  if(!createRes.ok) throw new Error('Drive folder create failed: ' + createRes.status);
+  const created = await createRes.json();
+  return created.id;
+}
+async function driveFindFile(){
+  if(!driveFolderId) driveFolderId = await driveFindOrCreateFolder();
+  const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false and '${driveFolderId}' in parents`);
+  const res = await driveFetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`);
+  if(!res.ok) throw new Error('Drive search failed: ' + res.status);
+  const data = await res.json();
+  return (data.files && data.files[0]) ? data.files[0].id : null;
+}
+async function driveGetFileContent(fileId){
+  const res = await driveFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+  if(!res.ok) throw new Error('Drive read failed: ' + res.status);
+  return await res.text();
+}
+async function driveCreateFile(content){
+  if(!driveFolderId) driveFolderId = await driveFindOrCreateFolder();
+  const metadata = { name: DRIVE_FILE_NAME, mimeType: 'application/json', parents: [driveFolderId] };
+  const boundary = 'task_tracking_boundary_7f3a9c';
+  const delimiter = '\r\n--' + boundary + '\r\n';
+  const closeDelim = '\r\n--' + boundary + '--';
+  const body =
+    delimiter + 'Content-Type: application/json\r\n\r\n' + JSON.stringify(metadata) +
+    delimiter + 'Content-Type: application/json\r\n\r\n' + content +
+    closeDelim;
+  const res = await driveFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    method: 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary="${boundary}"` },
+    body
+  });
+  if(!res.ok) throw new Error('Drive create failed: ' + res.status);
+  const data = await res.json();
+  return data.id;
+}
+async function driveUpdateFile(fileId, content){
+  const res = await driveFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: content
+  });
+  if(!res.ok) throw new Error('Drive update failed: ' + res.status);
+  return true;
+}
+
+async function loadState(){
+  let loaded = false;
+  for(let attempt = 1; attempt <= 3 && !loaded; attempt++){
+    try{
+      driveFileId = await driveFindFile();
+      if(driveFileId){
+        const text = await driveGetFileContent(driveFileId);
+        if(text){
+          const parsed = JSON.parse(text);
+          state = Object.assign({categories:{}, tasks:{}, trash:[], theme:'dark', nextXDays:3, collapsedSections:{}}, parsed);
+        }
+      }
+      loaded = true;
+    }catch(e){
+      console.log(`Drive load attempt ${attempt}/3 failed:`, e);
+      if(attempt < 3) await new Promise(r => setTimeout(r, 400 * attempt));
+    }
+  }
+  migrateState();
+  applyTheme();
+  purgeExpiredTrash();
+  const spawned = processRecurringTasks();
+  if(spawned > 0) saveState();
+  render();
+}
+// Guarantees every task/sub-task (however old) has the current node shape,
+// so older saved data can never crash newer app logic (e.g. missing "children").
+function ensureNodeShape(node){
+  if(!node || typeof node !== 'object') return;
+  if(Array.isArray(node.subtasks) && !Array.isArray(node.children)){ node.children = node.subtasks; }
+  if(!Array.isArray(node.children)) node.children = [];
+  delete node.subtasks;
+  if(typeof node.period !== 'object' || node.period === null) node.period = {start:null, end:null};
+  if(node.period.start === undefined) node.period.start = null;
+  if(node.period.end === undefined) node.period.end = null;
+  if(node.deadline === undefined) node.deadline = null;
+  if(node.description === undefined) node.description = '';
+  if(node.estimatedTime === undefined) node.estimatedTime = '';
+  if(node.importance === undefined || node.importance === null) node.importance = 4;
+  if(node.completed === undefined) node.completed = false;
+  if(node.type !== 'doby' && node.type !== 'ongoing') node.type = 'doby';
+  if(!Array.isArray(node.tags)) node.tags = [];
+  if(node.recurring === undefined) node.recurring = false;
+  if(node.recurring && node.type !== 'ongoing') node.recurring = false;
+  if(node.lastRecurrenceEnd === undefined) node.lastRecurrenceEnd = null;
+  if(typeof node.order !== 'number') node.order = nextOrder();
+  // Clean up the retired "Working" status from any older saved data.
+  delete node.working;
+  delete node.workingNote;
+  if(node.waiting === undefined) node.waiting = false;
+  if(node.waitingNote === undefined) node.waitingNote = '';
+  if(node.completed && node.waiting){ node.waiting = false; node.waitingNote = ''; }
+  node.children.forEach(ensureNodeShape);
+}
+function migrateState(){
+  if(!state.categories) state.categories = {};
+  if(!state.tasks) state.tasks = {};
+  if(!state.trash) state.trash = [];
+  if(state.theme !== 'light' && state.theme !== 'dark') state.theme = 'dark';
+  if(![1,2,3,4,5].includes(state.nextXDays)) state.nextXDays = 3;
+  nextXDays = state.nextXDays;
+  if(!state.collapsedSections || typeof state.collapsedSections !== 'object') state.collapsedSections = {};
+  Object.values(state.tasks).forEach(ensureNodeShape);
+  Object.values(state.categories).forEach(c => { if(c.description === undefined) c.description = ''; });
+}
+function applyTheme(){
+  const body = document.body;
+  if(!body) return;
+  body.classList.toggle('light-theme', state.theme === 'light');
+  const btn = document.getElementById('themeToggleBtn');
+  if(btn){
+    btn.textContent = state.theme === 'light' ? '🌙' : '☀️';
+    btn.title = state.theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
+  }
+}
+function toggleTheme(){
+  state.theme = state.theme === 'light' ? 'dark' : 'light';
+  applyTheme();
+  saveState();
+}
+let saveRetryTimer = null;
+function setSaveBadge(mode){
+  const el = document.getElementById('saveBadge');
+  if(!el) return;
+  if(mode === 'saving'){
+    el.className = 'save-badge saving';
+    el.innerHTML = 'Saving…';
+  } else if(mode === 'error'){
+    el.className = 'save-badge error';
+    el.innerHTML = `⚠ Changes aren't saving — your edits may be lost on refresh <button onclick="saveState()">Retry Now</button>`;
+  } else {
+    el.className = 'save-badge';
+    el.innerHTML = '';
+  }
+}
+// All callers invoke saveState() without awaiting it (mutations fire-and-forget
+// so the UI stays snappy). Without serialization, two rapid mutations could
+// both see driveFileId === null and race to create two separate Drive files.
+// This queue guarantees saves run one at a time, in order, using whatever
+// state is current at the moment each one actually starts.
+let saveChain = Promise.resolve();
+function saveState(){
+  saveChain = saveChain.then(() => doSaveState()).catch(() => {});
+  return saveChain;
+}
+async function doSaveState(){
+  if(saveRetryTimer){ clearTimeout(saveRetryTimer); saveRetryTimer = null; }
+  setSaveBadge('saving');
+  const maxAttempts = 3;
+  const content = JSON.stringify(state);
+  for(let attempt = 1; attempt <= maxAttempts; attempt++){
+    try{
+      if(!driveFileId) driveFileId = await driveFindFile();
+      if(driveFileId) await driveUpdateFile(driveFileId, content);
+      else driveFileId = await driveCreateFile(content);
+      setSaveBadge('ok');
+      return;
+    }catch(e){
+      console.error(`Drive save failed (attempt ${attempt}/${maxAttempts}):`, e);
+      if(attempt < maxAttempts){
+        await new Promise(r => setTimeout(r, 500 * attempt));
+      }
+    }
+  }
+  // All attempts failed — make it visible and keep retrying quietly in the background.
+  setSaveBadge('error');
+  saveRetryTimer = setTimeout(() => saveState(), 8000);
+}
+
+// ---------------------------------------------------------------------
+// GENERIC NODE HELPERS (a "node" is a task OR a sub-task — same shape)
+// pathIds === [] refers to the top-level task itself.
+// ---------------------------------------------------------------------
+function getNode(taskId, pathIds){
+  let node = state.tasks[taskId];
+  if(!node) return null;
+  if(!Array.isArray(node.children)) node.children = [];
+  for(const id of pathIds){
+    if(!Array.isArray(node.children)) return null;
+    node = node.children.find(c => c.id === id);
+    if(!node) return null;
+    if(!Array.isArray(node.children)) node.children = [];
+  }
+  return node;
+}
+function nodeKey(taskId, pathIds){ return taskId + '|' + pathIds.join(','); }
+
+// ---------------------------------------------------------------------
+// DATE RANGE TRACKER
+// ---------------------------------------------------------------------
+function updateRangeStart(v){ if(v) rangeStart = v; render(); }
+function updateRangeEnd(v){ if(v) rangeEnd = v; render(); }
+function resetRangeToDefault(){ rangeStart = todayStr(); rangeEnd = addDaysStr(rangeStart, 7); render(); }
+
+function dateInRange(dateOnlyStr, start, end){ return dateOnlyStr >= start && dateOnlyStr <= end; }
+function periodOverlapsRange(period, start, end){
+  if(!period || (!period.start && !period.end)) return false;
+  const s = period.start || '0000-01-01';
+  const e = period.end || '9999-12-31';
+  return s <= end && e >= start;
+}
+function forEachNode(cb){
+  function visit(taskId, node, pathIds){
+    cb(taskId, node, pathIds);
+    (node.children || []).forEach(child => visit(taskId, child, [...pathIds, child.id]));
+  }
+  Object.values(state.tasks).forEach(t => visit(t.id, t, []));
+}
+function collectNodesInRange(start, end){
+  const results = [];
+  forEachNode((taskId, node, pathIds) => {
+    let matches = false, sortDate = null;
+    if(node.type === 'doby'){
+      if(node.deadline){
+        const dateOnly = node.deadline.slice(0,10);
+        if(dateInRange(dateOnly, start, end)){ matches = true; sortDate = dateOnly; }
+      }
+    } else {
+      if(periodOverlapsRange(node.period, start, end)){ matches = true; sortDate = (node.period && node.period.start) || start; }
+    }
+    if(matches) results.push({ taskId, pathIds: [...pathIds], node, sortDate });
+  });
+  results.sort((a,b) => String(a.sortDate).localeCompare(String(b.sortDate)) || (b.node.importance - a.node.importance));
+  return results;
+}
+function daysBetweenStr(a, b){
+  const d1 = new Date(a + 'T00:00:00'), d2 = new Date(b + 'T00:00:00');
+  return Math.max(1, Math.round((d2 - d1) / (24*60*60*1000)));
+}
+function processRecurringTasks(){
+  const toSpawn = [];
+  const today = todayStr();
+  forEachNode((taskId, node, pathIds) => {
+    if(node.type === 'ongoing' && node.recurring && node.period && node.period.end &&
+       node.period.end < today && node.lastRecurrenceEnd !== node.period.end){
+      toSpawn.push({ taskId, pathIds: [...pathIds], node });
+    }
+  });
+  toSpawn.forEach(({taskId, pathIds, node}) => {
+    const oldEnd = node.period.end;
+    const oldStart = node.period.start || oldEnd;
+    const durationDays = daysBetweenStr(oldStart, oldEnd);
+    const newStart = addDaysStr(oldEnd, 1);
+    const newEnd = addDaysStr(newStart, durationDays);
+    const newNode = makeNode({
+      type: 'ongoing', title: node.title, description: node.description,
+      period: { start: newStart, end: newEnd }, estimatedTime: node.estimatedTime,
+      importance: node.importance, tags: node.tags, recurring: true
+    });
+    if(pathIds.length === 0){
+      newNode.categoryId = node.categoryId;
+      state.tasks[newNode.id] = newNode;
+    } else {
+      const parent = getNode(taskId, pathIds.slice(0,-1));
+      if(parent){
+        if(!Array.isArray(parent.children)) parent.children = [];
+        parent.children.push(newNode);
+      }
+    }
+    node.lastRecurrenceEnd = oldEnd;
+    if(!node.completed) node.completed = true;
+  });
+  return toSpawn.length;
+}
+function isOverdue(node){
+  return node.type === 'doby' && !node.completed && node.deadline && node.deadline.slice(0,10) < todayStr();
+}
+function collectOverdueNodes(){
+  const results = [];
+  forEachNode((taskId, node, pathIds) => {
+    if(isOverdue(node)) results.push({ taskId, pathIds: [...pathIds], node, sortDate: node.deadline.slice(0,10) });
+  });
+  results.sort((a,b) => String(a.sortDate).localeCompare(String(b.sortDate)) || (b.node.importance - a.node.importance));
+  return results;
+}
+function searchNodes(query){
+  const q = query.trim().toLowerCase();
+  if(!q) return { tasks: [], categories: [] };
+  const taskResults = [];
+  forEachNode((taskId, node, pathIds) => {
+    const inTitle = node.title.toLowerCase().includes(q);
+    const inDesc = (node.description || '').toLowerCase().includes(q);
+    const inTags = (node.tags || []).some(t => t.toLowerCase().includes(q));
+    if(inTitle || inDesc || inTags){
+      taskResults.push({ taskId, pathIds: [...pathIds], node, sortDate: node.type==='doby' ? (node.deadline||'') : ((node.period&&node.period.start)||'') });
+    }
+  });
+  const categoryResults = Object.values(state.categories).filter(c =>
+    c.name.toLowerCase().includes(q) || (c.description||'').toLowerCase().includes(q)
+  );
+  return { tasks: taskResults, categories: categoryResults };
+}
+function navigateToNode(taskId, pathStr){
+  const pathIds = pathStr ? pathStr.split(',') : [];
+  const task = state.tasks[taskId];
+  if(!task) return;
+  currentCategoryId = task.categoryId;
+  viewMode = 'browse';
+  searchQuery = '';
+  const searchEl = document.getElementById('searchInput');
+  if(searchEl) searchEl.value = '';
+  expandedNodes.clear();
+  for(let i=0;i<=pathIds.length;i++){ expandedNodes.add(nodeKey(taskId, pathIds.slice(0,i))); }
+  render();
+}
+
+let orderCounter = 0;
+function nextOrder(){ return Date.now() * 1000 + (orderCounter++ % 1000); }
+
+function makeNode(data){
+  return {
+    id: uid(),
+    type: data.type,
+    title: data.title,
+    description: data.description || '',
+    deadline: data.deadline || null,
+    period: data.period || {start:null, end:null},
+    createdAt: new Date().toISOString(),
+    estimatedTime: data.estimatedTime || '',
+    importance: Number(data.importance) || 4,
+    completed: false,
+    children: [],
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    recurring: !!data.recurring,
+    order: nextOrder(),
+    waiting: false,
+    waitingNote: ''
+  };
+}
+
+function addTask(categoryId, data){
+  const node = makeNode(data);
+  node.categoryId = categoryId;
+  state.tasks[node.id] = node;
+  saveState(); render();
+}
+function addChildNode(taskId, parentPathIds, data){
+  const parent = getNode(taskId, parentPathIds);
+  if(!parent) return;
+  if(!Array.isArray(parent.children)) parent.children = [];
+  parent.children.push(makeNode(data));
+  expandedNodes.add(nodeKey(taskId, parentPathIds));
+  saveState(); render();
+}
+function editNode(taskId, pathIds, data){
+  const node = getNode(taskId, pathIds);
+  if(!node) return;
+  node.type = data.type;
+  node.title = data.title;
+  node.description = data.description || '';
+  node.deadline = data.deadline || null;
+  node.period = data.period || {start:null, end:null};
+  node.estimatedTime = data.estimatedTime || '';
+  node.importance = Number(data.importance) || 4;
+  node.tags = Array.isArray(data.tags) ? data.tags : [];
+  node.recurring = node.type === 'ongoing' ? !!data.recurring : false;
+  saveState(); render();
+}
+function normPath(pathIds){
+  if(Array.isArray(pathIds)) return pathIds;
+  return pathIds ? pathIds.split(',') : [];
+}
+function toggleNodeComplete(taskId, pathIds){
+  pathIds = normPath(pathIds);
+  const node = getNode(taskId, pathIds);
+  if(!node) return;
+  node.completed = !node.completed;
+  if(node.completed && node.waiting){ node.waiting = false; node.waitingNote = ''; }
+  saveState(); render();
+}
+
+// ---------------------------------------------------------------------
+// DRAG-AND-DROP REORDERING
+// ---------------------------------------------------------------------
+let dragContext = null;
+function startDragTop(ev, categoryId, id){
+  dragContext = { kind:'top', categoryId, id };
+  try{ ev.dataTransfer.effectAllowed = 'move'; }catch(e){}
+}
+function dropTop(ev, categoryId, targetId){
+  ev.preventDefault();
+  if(!dragContext || dragContext.kind !== 'top' || dragContext.categoryId !== categoryId || dragContext.id === targetId){ dragContext = null; return; }
+  reorderTopLevelTask(categoryId, dragContext.id, targetId);
+  dragContext = null;
+}
+function startDragChild(ev, taskId, parentPathStr, id){
+  dragContext = { kind:'child', taskId, parentPathIds: normPath(parentPathStr), id };
+  try{ ev.dataTransfer.effectAllowed = 'move'; }catch(e){}
+}
+function dropChild(ev, taskId, parentPathStr, targetId){
+  ev.preventDefault();
+  const parentPathIds = normPath(parentPathStr);
+  if(!dragContext || dragContext.kind !== 'child' || dragContext.taskId !== taskId ||
+     dragContext.parentPathIds.join(',') !== parentPathIds.join(',') || dragContext.id === targetId){
+    dragContext = null; return;
+  }
+  reorderChildNode(taskId, parentPathIds, dragContext.id, targetId);
+  dragContext = null;
+}
+function reorderTopLevelTask(categoryId, draggedId, targetId){
+  const siblings = tasksInCategory(categoryId).sort((a,b) => (a.order ?? 0) - (b.order ?? 0));
+  const fromIdx = siblings.findIndex(t => t.id === draggedId);
+  const toIdx = siblings.findIndex(t => t.id === targetId);
+  if(fromIdx === -1 || toIdx === -1) return;
+  const [moved] = siblings.splice(fromIdx, 1);
+  siblings.splice(toIdx, 0, moved);
+  siblings.forEach((t, i) => { state.tasks[t.id].order = i; });
+  saveState(); render();
+}
+function reorderChildNode(taskId, parentPathIds, draggedId, targetId){
+  const parent = getNode(taskId, parentPathIds);
+  if(!parent || !Array.isArray(parent.children)) return;
+  const fromIdx = parent.children.findIndex(c => c.id === draggedId);
+  const toIdx = parent.children.findIndex(c => c.id === targetId);
+  if(fromIdx === -1 || toIdx === -1) return;
+  const [moved] = parent.children.splice(fromIdx, 1);
+  parent.children.splice(toIdx, 0, moved);
+  saveState(); render();
+}
+
+function deleteNode(taskId, pathIds){
+  pathIds = normPath(pathIds);
+  if(pathIds.length === 0){
+    if(!confirm('Move this task to the recycling bin?')) return;
+    const snapshot = deepClone(state.tasks[taskId]);
+    state.trash.push({ id: uid(), kind:'task', deletedAt: new Date().toISOString(), payload:{ task: snapshot } });
+    delete state.tasks[taskId];
+  } else {
+    if(!confirm('Move this sub-task to the recycling bin?')) return;
+    const parentPathIds = pathIds.slice(0,-1);
+    const targetId = pathIds[pathIds.length-1];
+    const parent = getNode(taskId, parentPathIds);
+    if(!parent) return;
+    const idx = parent.children.findIndex(c => c.id === targetId);
+    if(idx === -1) return;
+    const snapshot = deepClone(parent.children[idx]);
+    state.trash.push({ id: uid(), kind:'subtask', deletedAt: new Date().toISOString(), payload:{ taskId, parentPathIds, node: snapshot } });
+    parent.children.splice(idx,1);
+  }
+  saveState(); render();
+}
+
+// ---------------------------------------------------------------------
+// CATEGORY HELPERS
+// ---------------------------------------------------------------------
+function childCategories(parentId){ return Object.values(state.categories).filter(c => c.parentId === parentId); }
+function tasksInCategory(catId){ return Object.values(state.tasks).filter(t => t.categoryId === catId); }
+function categoryPath(id){
+  const path = []; let cur = id;
+  while(cur){ const c = state.categories[cur]; if(!c) break; path.unshift(c); cur = c.parentId; }
+  return path;
+}
+function countAllTasks(catId){
+  let total = tasksInCategory(catId).length;
+  childCategories(catId).forEach(sc => total += countAllTasks(sc.id));
+  return total;
+}
+function collectCategorySubtree(catId){
+  const categories = [state.categories[catId]];
+  const tasks = [...tasksInCategory(catId)];
+  childCategories(catId).forEach(sc => {
+    const sub = collectCategorySubtree(sc.id);
+    categories.push(...sub.categories);
+    tasks.push(...sub.tasks);
+  });
+  return { categories, tasks };
+}
+function addCategory(parentId, name, description){
+  const id = uid();
+  state.categories[id] = { id, parentId, name, description, createdAt: new Date().toISOString() };
+  saveState(); render();
+}
+function editCategory(id, name, description){
+  const c = state.categories[id];
+  if(!c) return;
+  c.name = name; c.description = description;
+  saveState(); render();
+}
+function deleteCategory(id){
+  if(!confirm('Move this category — and everything tracked inside it — to the recycling bin?')) return;
+  const subtree = collectCategorySubtree(id);
+  state.trash.push({ id: uid(), kind:'category', deletedAt: new Date().toISOString(),
+    payload: { categories: deepClone(subtree.categories), tasks: deepClone(subtree.tasks), rootName: state.categories[id].name } });
+  subtree.categories.forEach(c => delete state.categories[c.id]);
+  subtree.tasks.forEach(t => delete state.tasks[t.id]);
+  if(currentCategoryId === id) currentCategoryId = state.categories[id] ? state.categories[id].parentId : null;
+  saveState(); render();
+}
+
+// ---------------------------------------------------------------------
+// RECYCLING BIN
+// ---------------------------------------------------------------------
+function purgeExpiredTrash(){
+  const now = Date.now();
+  state.trash = state.trash.filter(e => (now - new Date(e.deletedAt).getTime()) < THIRTY_DAYS_MS);
+}
+function daysRemaining(deletedAt){
+  const elapsed = Date.now() - new Date(deletedAt).getTime();
+  return Math.max(0, Math.ceil((THIRTY_DAYS_MS - elapsed) / (24*60*60*1000)));
+}
+function openTrashView(){ viewMode = 'trash'; render(); }
+function closeTrashView(){ viewMode = 'browse'; render(); }
+
+function restoreTrashItem(trashId, opts){
+  opts = opts || {};
+  const entry = state.trash.find(e => e.id === trashId);
+  if(!entry) return false;
+
+  if(entry.kind === 'task'){
+    const t = entry.payload.task;
+    if(!state.categories[t.categoryId]){
+      if(!opts.silent) alert('Cannot restore — the category this task belonged to no longer exists.');
+      return false;
+    }
+    state.tasks[t.id] = t;
+  } else if(entry.kind === 'subtask'){
+    if(!state.tasks[entry.payload.taskId]){
+      if(!opts.silent) alert('Cannot restore — the parent task no longer exists.');
+      return false;
+    }
+    const parent = getNode(entry.payload.taskId, entry.payload.parentPathIds);
+    if(!parent){
+      if(!opts.silent) alert('Cannot restore — the location this sub-task lived in no longer exists.');
+      return false;
+    }
+    parent.children.push(entry.payload.node);
+  } else if(entry.kind === 'category'){
+    const parentId = entry.payload.categories[0].parentId;
+    if(parentId && !state.categories[parentId]){
+      if(!opts.silent) alert('Cannot restore — the parent category no longer exists.');
+      return false;
+    }
+    entry.payload.categories.forEach(c => state.categories[c.id] = c);
+    entry.payload.tasks.forEach(t => state.tasks[t.id] = t);
+  }
+  state.trash = state.trash.filter(e => e.id !== trashId);
+  if(!opts.silent){ saveState(); render(); }
+  return true;
+}
+function restoreAllTrash(){
+  if(state.trash.length === 0) return;
+  if(!confirm(`Restore all ${state.trash.length} item(s) from the recycling bin?`)) return;
+  const ids = state.trash.map(e => e.id);
+  let restored = 0, failed = 0;
+  ids.forEach(id => { if(restoreTrashItem(id, {silent:true})) restored++; else failed++; });
+  saveState(); render();
+  if(failed > 0) alert(`Restored ${restored} item(s). ${failed} couldn't be restored because their original location no longer exists.`);
+}
+function purgeTrashItem(trashId){
+  if(!confirm('Permanently delete this item? It cannot be recovered.')) return;
+  state.trash = state.trash.filter(e => e.id !== trashId);
+  saveState(); render();
+}
+function emptyTrash(){
+  if(state.trash.length === 0) return;
+  if(!confirm('Permanently delete everything in the recycling bin?')) return;
+  state.trash = [];
+  saveState(); render();
+}
+
+// ---------------------------------------------------------------------
+// NAVIGATION
+// ---------------------------------------------------------------------
+function navigateTo(catId){ viewMode='browse'; currentCategoryId = catId; expandedNodes.clear(); render(); }
+
+// ---------------------------------------------------------------------
+// MODALS — Category
+// ---------------------------------------------------------------------
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+function openCategoryModal(){
+  categoryEditId = null;
+  document.getElementById('catModalTitle').textContent = 'New Category';
+  document.getElementById('catModalSubmitBtn').textContent = 'Add Category';
+  document.getElementById('catName').value = '';
+  document.getElementById('catDesc').value = '';
+  openModal('categoryModalOverlay');
+}
+function openCategoryEditModal(id){
+  const c = state.categories[id];
+  if(!c) return;
+  categoryEditId = id;
+  document.getElementById('catModalTitle').textContent = 'Edit Category';
+  document.getElementById('catModalSubmitBtn').textContent = 'Save Changes';
+  document.getElementById('catName').value = c.name;
+  document.getElementById('catDesc').value = c.description || '';
+  openModal('categoryModalOverlay');
+}
+function submitCategory(){
+  const name = document.getElementById('catName').value.trim();
+  const desc = document.getElementById('catDesc').value.trim();
+  if(!name){ alert('Please give the category a name.'); return; }
+  if(categoryEditId){ editCategory(categoryEditId, name, desc); }
+  else { addCategory(currentCategoryId, name, desc); }
+  closeModal('categoryModalOverlay');
+}
+
+// ---------------------------------------------------------------------
+// MODALS — Node (task / sub-task, create & edit share one modal)
+// ---------------------------------------------------------------------
+function resetNodeForm(){
+  document.getElementById('nodeTitle').value = '';
+  document.getElementById('nodeDesc').value = '';
+  document.getElementById('nodeDeadline').value = '';
+  document.getElementById('nodePeriodStart').value = '';
+  document.getElementById('nodePeriodEnd').value = '';
+  document.getElementById('nodeEstTime').value = '';
+  document.getElementById('nodeImportance').value = '4';
+  document.getElementById('nodeTags').value = '';
+  document.getElementById('nodeRecurring').checked = false;
+}
+function setNodeType(type){
+  pendingNodeType = type;
+  document.getElementById('typeDobyBtn').classList.toggle('active', type==='doby');
+  document.getElementById('typeOngoingBtn').classList.toggle('active', type==='ongoing');
+  document.getElementById('typeOngoingBtn').classList.toggle('ongoing-active', type==='ongoing');
+  document.getElementById('nodeDeadlineField').style.display = type==='doby' ? 'block' : 'none';
+  document.getElementById('nodePeriodField').style.display = type==='ongoing' ? 'block' : 'none';
+  document.getElementById('nodeRecurringField').style.display = type==='ongoing' ? 'block' : 'none';
+}
+
+function openNewTaskModal(){
+  if(currentCategoryId === null){ alert('Tasks must be tracked inside a category. Open a category first.'); return; }
+  modalCtx = { mode:'create-task', categoryId: currentCategoryId };
+  resetNodeForm(); setNodeType('doby');
+  document.getElementById('nodeModalTitle').textContent = 'New Task';
+  document.getElementById('nodeModalSub').textContent = 'Track a new item in this category.';
+  document.getElementById('nodeModalSubmitBtn').textContent = 'Add Task';
+  openModal('nodeModalOverlay');
+}
+function openNewChildModal(taskId, parentPathIds){
+  parentPathIds = normPath(parentPathIds);
+  modalCtx = { mode:'create-child', taskId, parentPathIds };
+  resetNodeForm(); setNodeType('doby');
+  document.getElementById('nodeModalTitle').textContent = 'New Sub-Task';
+  document.getElementById('nodeModalSub').textContent = 'Break this item down a level further — it gets every field a task has.';
+  document.getElementById('nodeModalSubmitBtn').textContent = 'Add Sub-Task';
+  openModal('nodeModalOverlay');
+}
+function openWaitingModal(taskId, pathIds){
+  pathIds = normPath(pathIds);
+  const node = getNode(taskId, pathIds);
+  if(!node) return;
+  waitingModalCtx = { taskId, pathIds };
+  document.getElementById('waitingJustification').value = '';
+  openModal('waitingModalOverlay');
+}
+function submitWaitingJustification(){
+  if(!waitingModalCtx) return;
+  const node = getNode(waitingModalCtx.taskId, waitingModalCtx.pathIds);
+  if(node){
+    node.waiting = true;
+    node.waitingNote = document.getElementById('waitingJustification').value.trim();
+    saveState(); render();
+  }
+  waitingModalCtx = null;
+  closeModal('waitingModalOverlay');
+}
+function stopWaiting(taskId, pathIds){
+  pathIds = normPath(pathIds);
+  const node = getNode(taskId, pathIds);
+  if(!node) return;
+  node.waiting = false;
+  node.waitingNote = '';
+  saveState(); render();
+}
+
+function openEditNodeModal(taskId, pathIds){
+  pathIds = normPath(pathIds);
+  const node = getNode(taskId, pathIds);
+  if(!node) return;
+  modalCtx = { mode:'edit', taskId, pathIds };
+  document.getElementById('nodeTitle').value = node.title;
+  document.getElementById('nodeDesc').value = node.description || '';
+  document.getElementById('nodeDeadline').value = node.deadline || '';
+  document.getElementById('nodePeriodStart').value = (node.period && node.period.start) || '';
+  document.getElementById('nodePeriodEnd').value = (node.period && node.period.end) || '';
+  document.getElementById('nodeEstTime').value = node.estimatedTime || '';
+  document.getElementById('nodeImportance').value = String(node.importance);
+  document.getElementById('nodeTags').value = (node.tags || []).join(', ');
+  document.getElementById('nodeRecurring').checked = !!node.recurring;
+  setNodeType(node.type);
+  document.getElementById('nodeModalTitle').textContent = pathIds.length===0 ? 'Edit Task' : 'Edit Sub-Task';
+  document.getElementById('nodeModalSub').textContent = 'Update any field below.';
+  document.getElementById('nodeModalSubmitBtn').textContent = 'Save Changes';
+  openModal('nodeModalOverlay');
+}
+function submitNodeModal(){
+  const title = document.getElementById('nodeTitle').value.trim();
+  if(!title){ alert('Please give it a title.'); return; }
+  const periodStart = document.getElementById('nodePeriodStart').value;
+  const periodEnd = document.getElementById('nodePeriodEnd').value;
+  if(pendingNodeType === 'ongoing' && periodStart && periodEnd && periodEnd < periodStart){
+    alert('End date must be on or after the start date.'); return;
+  }
+  if(pendingNodeType === 'ongoing' && document.getElementById('nodeRecurring').checked && (!periodStart || !periodEnd)){
+    alert('Recurring tasks need both a start and end date, so the app knows how long each occurrence lasts.'); return;
+  }
+  const tags = document.getElementById('nodeTags').value.split(',').map(t => t.trim()).filter(Boolean);
+  const data = {
+    type: pendingNodeType,
+    title,
+    description: document.getElementById('nodeDesc').value.trim(),
+    deadline: document.getElementById('nodeDeadline').value,
+    period: { start: periodStart || null, end: periodEnd || null },
+    estimatedTime: document.getElementById('nodeEstTime').value.trim(),
+    importance: document.getElementById('nodeImportance').value,
+    tags,
+    recurring: pendingNodeType === 'ongoing' && document.getElementById('nodeRecurring').checked
+  };
+  if(modalCtx.mode === 'create-task') addTask(modalCtx.categoryId, data);
+  else if(modalCtx.mode === 'create-child') addChildNode(modalCtx.taskId, modalCtx.parentPathIds, data);
+  else if(modalCtx.mode === 'edit') editNode(modalCtx.taskId, modalCtx.pathIds, data);
+  closeModal('nodeModalOverlay');
+}
+
+// ---------------------------------------------------------------------
+// RENDER HELPERS
+// ---------------------------------------------------------------------
+function esc(s){ return (s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+function fmtDateTime(iso){
+  if(!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+function fmtDate(dateStr){
+  if(!dateStr) return '—';
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+}
+function fmtPeriod(period){
+  if(!period || (!period.start && !period.end)) return 'no period set';
+  return `${fmtDate(period.start)} → ${fmtDate(period.end)}`;
+}
+
+function render(){
+  renderBreadcrumb();
+  if(viewMode === 'trash') renderTrash();
+  else if(searchQuery.trim() !== '') renderSearchResults();
+  else renderMain();
+}
+
+function renderBreadcrumb(){
+  const el = document.getElementById('breadcrumb');
+  const badge = document.getElementById('trashBadge');
+  purgeExpiredTrash();
+  if(state.trash.length > 0){ badge.style.display='inline'; badge.textContent = state.trash.length; }
+  else badge.style.display = 'none';
+
+  if(viewMode === 'trash'){
+    el.innerHTML = `<span class="crumb" onclick="closeTrashView()">🏠 Home</span><span class="sep">/</span><span class="crumb current">🗑 Recycling Bin</span>`;
+    return;
+  }
+  const path = currentCategoryId ? categoryPath(currentCategoryId) : [];
+  let html = `<span class="crumb ${currentCategoryId===null?'current':''}" onclick="navigateTo(null)">🏠 Home</span>`;
+  path.forEach((c,i) => {
+    html += `<span class="sep">/</span><span class="crumb ${i===path.length-1?'current':''}" onclick="navigateTo('${c.id}')">${esc(c.name)}</span>`;
+  });
+  el.innerHTML = html;
+}
+
+function renderMain(){
+  const main = document.getElementById('main');
+  const subcats = childCategories(currentCategoryId);
+  const tasks = currentCategoryId ? tasksInCategory(currentCategoryId) : [];
+  let html = '';
+
+  html += `<div class="section-title"><h2>${currentCategoryId===null ? 'Categories' : 'Sub-Categories'}</h2>
+    <button class="btn ghost small" onclick="openCategoryModal()">+ New ${currentCategoryId===null?'Category':'Sub-Category'}</button></div>`;
+
+  if(subcats.length === 0){
+    html += `<div class="empty-note">No categories yet. Add one to get started.</div>`;
+  } else {
+    html += `<div class="folder-grid">`;
+    subcats.forEach(c => {
+      const taskCount = countAllTasks(c.id);
+      const subCount = childCategories(c.id).length;
+      html += `
+        <div class="folder-tab" onclick="navigateTo('${c.id}')">
+          <div class="tab-actions">
+            <button onclick="event.stopPropagation(); openCategoryEditModal('${c.id}')" title="Edit">✎</button>
+            <button onclick="event.stopPropagation(); deleteCategory('${c.id}')" title="Delete">✕</button>
+          </div>
+          <h3>${esc(c.name)}</h3>
+          <div class="meta">${subCount} sub-categor${subCount!==1?'ies':'y'} · ${taskCount} task${taskCount!==1?'s':''}</div>
+          ${c.description ? `<div class="tooltip">${esc(c.description)}</div>` : ''}
+        </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if(currentCategoryId !== null){
+    const tasksKey = 'tasks:' + currentCategoryId;
+    html += sectionHeader(tasksKey, 'Tasks', `<button class="btn small" onclick="openNewTaskModal()">+ New Task</button>`);
+    if(!isSectionCollapsed(tasksKey)){
+      if(tasks.length === 0){
+        html += `<div class="empty-note">No tasks tracked in this category yet.</div>`;
+      } else {
+        const sorted = [...tasks].sort((a,b) => (a.order ?? 0) - (b.order ?? 0));
+        html += `<div class="task-list">`;
+        sorted.forEach(t => { html += renderNodeCard(t.id, []); });
+        html += `</div>`;
+      }
+    }
+  }
+
+  if(currentCategoryId === null){
+    html += renderOverdueSection();
+    html += renderNextXSection();
+    html += renderNextWeekSection();
+    html += renderRangeSection();
+  }
+
+  main.innerHTML = html;
+}
+
+function renderOverdueSection(){
+  const raw = collectOverdueNodes();
+  const key = 'overdue';
+  let html = sectionHeader(key, '⚠ Overdue');
+  if(isSectionCollapsed(key)) return html;
+  if(raw.length === 0){
+    html += `<div class="empty-note">Nothing overdue. 🎉</div>`;
+    return html;
+  }
+  const results = applySortFilter(raw, sectionControls.overdue);
+  html += renderListControls('overdue');
+  if(results.length === 0){
+    html += `<div class="empty-note">No tasks match the current filters.</div>`;
+  } else {
+    html += `<div class="task-list">`;
+    results.forEach(r => { html += renderRangeItem(r); });
+    html += `</div>`;
+  }
+  return html;
+}
+
+function renderNextXSection(){
+  const key = 'nextx';
+  let html = sectionHeader(key, `🔭 Next ${nextXDays} Day${nextXDays!==1?'s':''}`);
+  if(isSectionCollapsed(key)) return html;
+  html += `<div class="range-controls">
+      <div><span>Show next</span>
+        <div class="day-toggle">
+          ${[1,2,3,4,5].map(n => `<button class="${n===nextXDays?'active':''}" onclick="updateNextXDays(${n})">${n}</button>`).join('')}
+        </div>
+      </div>
+    </div>`;
+  const start = todayStr();
+  const end = addDaysStr(start, nextXDays);
+  const raw = collectNodesInRange(start, end);
+  const results = applySortFilter(raw, sectionControls.nextx);
+  html += renderListControls('nextx');
+  if(raw.length === 0){
+    html += `<div class="empty-note">Nothing due or active in the next ${nextXDays} day${nextXDays!==1?'s':''}.</div>`;
+  } else if(results.length === 0){
+    html += `<div class="empty-note">No tasks match the current filters.</div>`;
+  } else {
+    html += `<div class="task-list">`;
+    results.forEach(r => { html += renderRangeItem(r); });
+    html += `</div>`;
+  }
+  return html;
+}
+
+function renderNextWeekSection(){
+  const key = 'nextweek';
+  let html = sectionHeader(key, '📌 Next 7 Days');
+  if(isSectionCollapsed(key)) return html;
+  const start = todayStr();
+  const end = addDaysStr(start, 7);
+  const raw = collectNodesInRange(start, end);
+  const results = applySortFilter(raw, sectionControls.nextweek);
+  html += renderListControls('nextweek');
+  if(raw.length === 0){
+    html += `<div class="empty-note">Nothing due or active in the next 7 days.</div>`;
+  } else if(results.length === 0){
+    html += `<div class="empty-note">No tasks match the current filters.</div>`;
+  } else {
+    html += `<div class="task-list">`;
+    results.forEach(r => { html += renderRangeItem(r); });
+    html += `</div>`;
+  }
+  return html;
+}
+
+function renderRangeSection(){
+  const key = 'range';
+  let html = sectionHeader(key, '📅 Tasks in Range');
+  if(isSectionCollapsed(key)) return html;
+  html += `<div class="range-controls">
+      <div><span>From</span><input type="date" id="rangeStartInput" value="${rangeStart}" max="${rangeEnd}" onchange="updateRangeStart(this.value)"></div>
+      <div><span>To</span><input type="date" id="rangeEndInput" value="${rangeEnd}" min="${rangeStart}" onchange="updateRangeEnd(this.value)"></div>
+      <button class="btn ghost small reset-btn" onclick="resetRangeToDefault()">Reset to Today</button>
+    </div>`;
+  const raw = collectNodesInRange(rangeStart, rangeEnd);
+  const results = applySortFilter(raw, sectionControls.range);
+  html += renderListControls('range');
+  if(raw.length === 0){
+    html += `<div class="empty-note">Nothing due or active in this range.</div>`;
+  } else if(results.length === 0){
+    html += `<div class="empty-note">No tasks match the current filters.</div>`;
+  } else {
+    html += `<div class="task-list">`;
+    results.forEach(r => { html += renderRangeItem(r); });
+    html += `</div>`;
+  }
+  return html;
+}
+
+function renderTagChips(tags){
+  if(!tags || tags.length === 0) return '';
+  return `<div class="tag-chips">${tags.map(t => `<span class="tag-chip">#${esc(t)}</span>`).join('')}</div>`;
+}
+
+function renderRangeItem(r){
+  const node = r.node;
+  const isOngoing = node.type === 'ongoing';
+  const isSub = r.pathIds.length > 0;
+  const topTask = state.tasks[r.taskId];
+  if(!topTask) return '';
+  const catPath = categoryPath(topTask.categoryId).map(c => c.name).join(' / ') || '—';
+  const overdue = isOverdue(node);
+  let dots = ''; for(let i=1;i<=7;i++){ dots += `<div class="dot ${i<=node.importance?'filled':''}"></div>`; }
+  return `<div class="task-card ${isOngoing?'ongoing':''} ${node.completed?'completed':''} ${overdue?'overdue':''}" style="cursor:pointer;" onclick="navigateToNode('${r.taskId}', '${r.pathIds.join(',')}')">
+      <div class="task-top">
+        <div class="task-main">
+          <div class="task-title-row">
+            <span class="task-title">${esc(node.title)}</span>
+            <span class="tag ${isOngoing?'ongoing':''}">${isOngoing?'Ongoing':'Do-By'}</span>
+            ${overdue ? `<span class="tag overdue-tag">Overdue</span>` : ''}
+            ${node.waiting ? `<span class="tag waiting-tag">Waiting</span>` : ''}
+            ${node.recurring ? `<span title="Repeats automatically">🔁</span>` : ''}
+            ${isSub ? `<span class="tag" style="border-color:var(--ink-soft);color:var(--ink-soft);">Sub-task</span>` : ''}
+          </div>
+          <div class="task-meta">
+            <span>📁 ${esc(catPath)}${isSub ? ' → ' + esc(topTask.title) : ''}</span>
+            <span>${isOngoing ? '⏳ ' + esc(fmtPeriod(node.period)) : '⏰ ' + fmtDateTime(node.deadline)}</span>
+          </div>
+          ${renderTagChips(node.tags)}
+        </div>
+        <div class="stamp-wrap"><div class="stamp-num">${node.importance}</div><div class="dots">${dots}</div></div>
+      </div>
+    </div>`;
+}
+
+function renderNodeCard(taskId, pathIds){
+  const node = getNode(taskId, pathIds);
+  if(!node) return '';
+  const isTop = pathIds.length === 0;
+  const isOngoing = node.type === 'ongoing';
+  const key = nodeKey(taskId, pathIds);
+  const expanded = expandedNodes.has(key);
+  const overdue = isOverdue(node);
+
+  let dots = '';
+  for(let i=1;i<=7;i++){ dots += `<div class="dot ${i<=node.importance?'filled':''}"></div>`; }
+
+  let subdashHtml = '';
+  if(node.children && node.children.length > 0){
+    const total = node.children.length;
+    const done = node.children.filter(c => c.completed).length;
+    let marks = '';
+    node.children.forEach(c => { marks += `<div class="subdash ${c.completed?'filled':''}"></div>`; });
+    subdashHtml = `<span class="subdash-row">🧩 <span class="subdash-marks">${marks}</span> ${done}/${total}</span>`;
+  }
+
+  const parentPathStr = pathIds.slice(0,-1).join(',');
+  const dragAttrs = isTop
+    ? `draggable="true" ondragstart="startDragTop(event, '${node.categoryId}', '${node.id}')" ondragover="event.preventDefault()" ondrop="dropTop(event, '${node.categoryId}', '${node.id}')"`
+    : `draggable="true" ondragstart="startDragChild(event, '${taskId}', '${parentPathStr}', '${node.id}')" ondragover="event.preventDefault()" ondrop="dropChild(event, '${taskId}', '${parentPathStr}', '${node.id}')"`;
+
+  let html = `<div class="task-card ${isOngoing?'ongoing':''} ${node.completed?'completed':''} ${overdue?'overdue':''}" ${dragAttrs}>`;
+  if(node.completed) html += `<div class="complete-stamp">✓ COMPLETE</div>`;
+  html += `<div class="task-top">
+      <span class="drag-handle" title="Drag to reorder">⠿</span>
+      <div class="task-main" onclick="toggleExpand('${key}')">
+        <div class="task-title-row">
+          <span class="task-title">${esc(node.title)}</span>
+          <span class="tag ${isOngoing?'ongoing':''}">${isOngoing?'Ongoing':'Do-By'}</span>
+          ${overdue ? `<span class="tag overdue-tag">Overdue</span>` : ''}
+          ${node.waiting ? `<span class="tag waiting-tag">Waiting</span>` : ''}
+          ${node.recurring ? `<span title="Repeats automatically">🔁</span>` : ''}
+        </div>
+        <div class="task-meta">
+          <span>${isOngoing ? '⏳ ' + esc(fmtPeriod(node.period)) : '⏰ ' + fmtDateTime(node.deadline)}</span>
+          <span>🕐 ${esc(node.estimatedTime || '—')}</span>
+          <span>added ${fmtDateTime(node.createdAt)}</span>
+          ${subdashHtml}
+        </div>
+        ${renderTagChips(node.tags)}
+      </div>
+      <div class="stamp-wrap">
+        <div class="stamp-num">${node.importance}</div>
+        <div class="dots">${dots}</div>
+      </div>
+    </div>`;
+
+  if(expanded){
+    html += `<div class="task-detail">
+      <p>${node.description ? esc(node.description) : '<em>No description provided.</em>'}</p>
+      ${node.waiting ? `<div class="waiting-note"><strong>Waiting — Justification</strong>${node.waitingNote ? esc(node.waitingNote) : '<em>No justification provided.</em>'}</div>` : ''}
+      <div class="row">
+        <div><span>Created</span>${fmtDateTime(node.createdAt)}</div>
+        <div><span>${isOngoing?'Period':'Deadline'}</span>${isOngoing ? esc(fmtPeriod(node.period)) : fmtDateTime(node.deadline)}</div>
+        <div><span>Est. Time</span>${esc(node.estimatedTime||'—')}</div>
+        <div><span>Importance</span>${node.importance} / 7</div>
+      </div>
+      <div class="task-detail-actions">
+        ${node.waiting
+          ? `<button class="btn ghost small" onclick="stopWaiting('${taskId}', '${pathIds.join(',')}')">Stop Waiting</button>`
+          : `<button class="btn ghost small" onclick="openWaitingModal('${taskId}', '${pathIds.join(',')}')">Mark as Waiting</button>`}
+        <button class="btn subtle small" onclick="openEditNodeModal('${taskId}', '${pathIds.join(',')}')">Edit</button>
+        <button class="btn danger small" onclick="deleteNode('${taskId}', '${pathIds.join(',')}')">Delete</button>
+      </div>`;
+
+    html += `<div class="section-title" style="margin:14px 0 6px;">
+        <h2 style="font-size:12px;">Sub-Tasks</h2>
+        <button class="btn ghost small" onclick="openNewChildModal('${taskId}', '${pathIds.join(',')}')">+ Add Sub-Task</button>
+      </div>`;
+    if(!node.children || node.children.length === 0){
+      html += `<div class="empty-note" style="padding:4px 2px;">No sub-tasks yet.</div>`;
+    } else {
+      html += `<div class="children-list">`;
+      node.children.forEach(child => { html += renderNodeCard(taskId, [...pathIds, child.id]); });
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+function toggleExpand(key){
+  if(expandedNodes.has(key)) expandedNodes.delete(key);
+  else expandedNodes.add(key);
+  render();
+}
+
+// ---------------------------------------------------------------------
+// TRASH VIEW
+// ---------------------------------------------------------------------
+function updateSearchQuery(v){ searchQuery = v; render(); }
+function clearSearch(){
+  searchQuery = '';
+  const el = document.getElementById('searchInput');
+  if(el) el.value = '';
+  render();
+}
+function renderSearchResults(){
+  const main = document.getElementById('main');
+  const { tasks, categories } = searchNodes(searchQuery);
+  let html = `<div class="section-title"><h2>🔍 Search Results</h2>
+    <button class="btn ghost small" onclick="clearSearch()">Clear Search</button></div>`;
+  html += `<div class="empty-note" style="padding:0 0 14px;">Matching "${esc(searchQuery.trim())}" across every category, task, sub-task, and tag.</div>`;
+
+  if(categories.length === 0 && tasks.length === 0){
+    html += `<div class="empty-note">No matches found.</div>`;
+    main.innerHTML = html;
+    return;
+  }
+
+  if(categories.length > 0){
+    html += `<div class="section-title" style="margin-top:20px;"><h2 style="font-size:13px;">Categories</h2></div>`;
+    html += `<div class="folder-grid">`;
+    categories.forEach(c => {
+      const taskCount = countAllTasks(c.id);
+      const subCount = childCategories(c.id).length;
+      html += `<div class="folder-tab" onclick="clearSearch(); navigateTo('${c.id}')">
+          <h3>${esc(c.name)}</h3>
+          <div class="meta">${subCount} sub-categor${subCount!==1?'ies':'y'} · ${taskCount} task${taskCount!==1?'s':''}</div>
+          ${c.description ? `<div class="tooltip">${esc(c.description)}</div>` : ''}
+        </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if(tasks.length > 0){
+    html += `<div class="section-title" style="margin-top:20px;"><h2 style="font-size:13px;">Tasks &amp; Sub-Tasks</h2></div>`;
+    html += `<div class="task-list">`;
+    tasks.forEach(r => { html += renderRangeItem(r); });
+    html += `</div>`;
+  }
+
+  main.innerHTML = html;
+}
+
+function exportData(){
+  try{
+    const dataStr = JSON.stringify(state, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `task-tracking-backup-${todayStr()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }catch(e){
+    console.error('Export failed:', e);
+    alert('Export failed — see console for details.');
+  }
+}
+function handleImportFile(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try{
+      const parsed = JSON.parse(e.target.result);
+      if(!parsed || typeof parsed !== 'object' || !parsed.tasks || !parsed.categories){
+        alert("This doesn't look like a valid Task Tracking backup file.");
+        return;
+      }
+      if(!confirm('Import this backup? It will replace all data currently shown, and the merged result will be saved.')) return;
+      state = Object.assign(
+        { categories:{}, tasks:{}, trash:[], theme: state.theme, nextXDays: state.nextXDays, collapsedSections: state.collapsedSections },
+        parsed
+      );
+      migrateState();
+      currentCategoryId = null;
+      viewMode = 'browse';
+      expandedNodes.clear();
+      saveState();
+      render();
+      alert('Import complete.');
+    }catch(err){
+      console.error('Import failed:', err);
+      alert("Could not read that file — make sure it's a JSON export from this app.");
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function trashItemLabel(entry){
+  if(entry.kind === 'task') return { icon:'📌', kind:'Task', title: entry.payload.task.title };
+  if(entry.kind === 'subtask') return { icon:'📎', kind:'Sub-Task', title: entry.payload.node.title };
+  if(entry.kind === 'category') return { icon:'📁', kind:'Category', title: entry.payload.rootName };
+  return { icon:'❔', kind:'Item', title:'Unknown' };
+}
+function renderTrash(){
+  purgeExpiredTrash();
+  const main = document.getElementById('main');
+  let html = `<div class="section-title"><h2>Recycling Bin</h2>
+    <div style="display:flex;gap:8px;">
+      <button class="btn ghost small" onclick="restoreAllTrash()" ${state.trash.length===0?'disabled':''}>Restore All</button>
+      <button class="btn subtle small" onclick="emptyTrash()">Empty Bin</button>
+    </div></div>`;
+  html += `<div class="empty-note" style="padding:0 0 14px;">Deleted categories, tasks, and sub-tasks stay here for 30 days before they're gone for good.</div>`;
+
+  if(state.trash.length === 0){
+    html += `<div class="empty-note">The bin is empty.</div>`;
+  } else {
+    const counts = { task:0, subtask:0, category:0 };
+    state.trash.forEach(e => { if(counts[e.kind] !== undefined) counts[e.kind]++; });
+    html += `<div class="empty-note" style="padding:0 0 14px;">📌 ${counts.task} task${counts.task!==1?'s':''} · 📎 ${counts.subtask} sub-task${counts.subtask!==1?'s':''} · 📁 ${counts.category} categor${counts.category!==1?'ies':'y'}</div>`;
+    const sorted = [...state.trash].sort((a,b) => new Date(b.deletedAt) - new Date(a.deletedAt));
+    html += `<div class="trash-list">`;
+    sorted.forEach(entry => {
+      const label = trashItemLabel(entry);
+      const days = daysRemaining(entry.deletedAt);
+      html += `<div class="trash-item">
+          <div class="ti-main">
+            <span class="ti-kind">${label.icon} ${label.kind}</span>
+            <span class="ti-title">${esc(label.title)}</span>
+            <div class="ti-meta">Deleted ${fmtDateTime(entry.deletedAt)} · auto-purges in ${days} day${days!==1?'s':''}</div>
+          </div>
+          <div class="ti-actions">
+            <button class="btn small" onclick="restoreTrashItem('${entry.id}')">Restore</button>
+            <button class="btn danger small" onclick="purgeTrashItem('${entry.id}')">Delete Forever</button>
+          </div>
+        </div>`;
+    });
+    html += `</div>`;
+  }
+  main.innerHTML = html;
+}
+
+// close modal when clicking outside
+document.querySelectorAll('.modal-overlay').forEach(ov => {
+  ov.addEventListener('click', e => { if(e.target === ov) ov.classList.remove('open'); });
+});
+
+// ---------------------------------------------------------------------
+// KEYBOARD SHORTCUTS
+// ---------------------------------------------------------------------
+document.addEventListener('keydown', (e) => {
+  const tag = (document.activeElement && document.activeElement.tagName) || '';
+  const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+  if(e.key === 'Escape'){
+    document.querySelectorAll('.modal-overlay.open').forEach(ov => ov.classList.remove('open'));
+    if(typing && document.activeElement.id === 'searchInput') document.activeElement.blur();
+    return;
+  }
+  if(typing) return;
+
+  if(e.key === '/'){
+    e.preventDefault();
+    const el = document.getElementById('searchInput');
+    if(el) el.focus();
+    return;
+  }
+  if(e.key === 'n' || e.key === 'N'){
+    e.preventDefault();
+    if(viewMode === 'browse' && currentCategoryId !== null) openNewTaskModal();
+    else if(viewMode === 'browse') openCategoryModal();
+  }
+});
+
+waitForGoogleIdentity(() => { initGoogleAuth(); });
+</script>
+
+</body>
+</html>
