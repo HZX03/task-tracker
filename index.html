@@ -450,6 +450,10 @@ const GOOGLE_CLIENT_ID = '210912226684-l0btp1egeoakjn4ujm7flkq7nj5jsak2.apps.goo
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE_FILE_NAME = 'task-tracking-data.json';
 const DRIVE_FOLDER_NAME = 'Task Tracker';
+// This app is for one person only — hinting the account skips Google's
+// "choose an account" picker on every sign-in. Change or blank this out
+// if you ever want to use a different Google account.
+const GOOGLE_ACCOUNT_HINT = 'zhexi.ho@gmail.com';
 
 let driveFolderId = null;
 let tokenClient = null;
@@ -471,6 +475,7 @@ function initGoogleAuth(){
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
     scope: DRIVE_SCOPE,
+    hint: GOOGLE_ACCOUNT_HINT || undefined,
     callback: (tokenResponse) => {
       if(tokenResponse && tokenResponse.access_token){
         driveAccessToken = tokenResponse.access_token;
@@ -520,7 +525,10 @@ function signIn(){
   if(!tokenClient){ setAuthStatus('Still loading Google Sign-In — try again in a moment.', true); return; }
   silentAttemptDone = true; // a manual click's failure should show the real error, not silently fall back again
   setAuthStatus('Opening Google sign-in…');
-  tokenClient.requestAccessToken({ prompt: 'consent' });
+  // No forced prompt here: letting Google decide means it reuses your
+  // existing grant (skipping the consent + "unverified app" screens)
+  // whenever possible, only asking again if it genuinely has to.
+  tokenClient.requestAccessToken();
 }
 function signOut(){
   if(driveAccessToken && window.google && google.accounts && google.accounts.oauth2){
