@@ -242,12 +242,14 @@
   .cal-nav-btn:hover{background:rgba(47,143,209,0.15);}
   .cal-toolbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .cal-sync-status{font-family:'JetBrains Mono';font-size:10.5px;color:var(--page-text-soft);opacity:0.85;}
+  .cal-range-setting{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:'JetBrains Mono';font-size:10.5px;color:var(--page-text-soft);margin-bottom:14px;}
+  .cal-range-setting input{width:48px;padding:4px 6px;border:1px solid var(--brass);border-radius:3px;background:var(--paper-light);font-family:'JetBrains Mono';font-size:11px;color:var(--ink);}
   .cal-grid{background:var(--paper);border:1px solid var(--line);border-radius:6px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.28);}
   .cal-weekday-row{display:grid;grid-template-columns:repeat(7,1fr);background:rgba(47,143,209,0.1);}
   .cal-weekday-row div{font-family:'JetBrains Mono';font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--brass);padding:8px 6px;text-align:center;}
-  .cal-week-row{display:grid;grid-template-columns:repeat(7,1fr);}
-  .cal-day{min-height:96px;border-top:1px solid var(--line);border-right:1px solid var(--line);padding:6px;cursor:pointer;display:flex;flex-direction:column;gap:3px;position:relative;}
-  .cal-week-row .cal-day:last-child{border-right:none;}
+  .cal-body{display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:1fr;height:660px;}
+  .cal-day{border-top:1px solid var(--line);border-right:1px solid var(--line);padding:6px;cursor:pointer;display:flex;flex-direction:column;gap:3px;position:relative;overflow:hidden;min-width:0;}
+  .cal-day:nth-child(7n){border-right:none;}
   .cal-day:hover{background:rgba(47,143,209,0.06);}
   .cal-day.other-month{opacity:0.38;}
   .cal-day.today .cal-daynum{background:var(--brass);color:var(--paper-dark-2);}
@@ -266,7 +268,8 @@
     .folder-grid{grid-template-columns:1fr 1fr;}
     .task-top{flex-wrap:wrap;}
     .masthead{flex-direction:column;align-items:flex-start;}
-    .cal-day{min-height:64px;}
+    .cal-day{padding:4px;}
+    .cal-body{height:auto;grid-auto-rows:minmax(64px,1fr);}
     .cal-toolbar-left h2{min-width:0;font-size:16px;}
   }
 </style>
@@ -408,7 +411,7 @@
 // ---------------------------------------------------------------------
 // STATE
 // ---------------------------------------------------------------------
-let state = { categories: {}, tasks: {}, trash: [], theme: 'dark', nextXDays: 3, collapsedSections: {}, calendarEvents: {}, dismissedGoogleEventIds: [], calendarSync: { lastSyncedAt: null } };
+let state = { categories: {}, tasks: {}, trash: [], theme: 'dark', nextXDays: 3, collapsedSections: {}, calendarEvents: {}, dismissedGoogleEventIds: [], calendarSync: { lastSyncedAt: null }, calendarSyncRangePastMonths: 1, calendarSyncRangeFutureMonths: 6 };
 let currentCategoryId = null;   // null = root/home
 let viewMode = 'browse';        // 'browse' | 'trash'
 let topTab = 'home';            // 'home' | 'scheduling'
@@ -718,7 +721,7 @@ async function loadState(){
         const text = await driveGetFileContent(driveFileId);
         if(text){
           const parsed = JSON.parse(text);
-          state = Object.assign({categories:{}, tasks:{}, trash:[], theme:'dark', nextXDays:3, collapsedSections:{}, calendarEvents:{}, dismissedGoogleEventIds:[], calendarSync:{lastSyncedAt:null}}, parsed);
+          state = Object.assign({categories:{}, tasks:{}, trash:[], theme:'dark', nextXDays:3, collapsedSections:{}, calendarEvents:{}, dismissedGoogleEventIds:[], calendarSync:{lastSyncedAt:null}, calendarSyncRangePastMonths:1, calendarSyncRangeFutureMonths:6}, parsed);
         }
       }
       loaded = true;
@@ -731,7 +734,8 @@ async function loadState(){
   applyTheme();
   purgeExpiredTrash();
   const spawned = processRecurringTasks();
-  if(spawned > 0) saveState();
+  const deduped = dedupeImportedCalendarEvents();
+  if(spawned > 0 || deduped > 0) saveState();
   render();
 }
 // Guarantees every task/sub-task (however old) has the current node shape,
@@ -776,7 +780,33 @@ function migrateState(){
   if(!state.calendarEvents || typeof state.calendarEvents !== 'object') state.calendarEvents = {};
   if(!Array.isArray(state.dismissedGoogleEventIds)) state.dismissedGoogleEventIds = [];
   if(!state.calendarSync || typeof state.calendarSync !== 'object') state.calendarSync = { lastSyncedAt: null };
+  if(!Number.isFinite(state.calendarSyncRangePastMonths) || state.calendarSyncRangePastMonths < 0) state.calendarSyncRangePastMonths = 1;
+  if(!Number.isFinite(state.calendarSyncRangeFutureMonths) || state.calendarSyncRangeFutureMonths < 0) state.calendarSyncRangeFutureMonths = 6;
   Object.values(state.calendarEvents).forEach(ensureEventShape);
+  dedupeImportedCalendarEvents();
+}
+// Removes duplicate imported events that represent the same real-world event
+// seen through two different Google calendars (classic case: a contact's
+// birthday shows up both in your primary calendar's auto-birthdays AND in
+// the dedicated "Birthdays" calendar). Never touches events you created
+// yourself in this app — only ones with a googleEventId.
+function eventContentKey(ev){
+  return [ev.title, ev.startDate, ev.endDate, ev.allDay, ev.startTime||'', ev.endTime||''].join('|');
+}
+function dedupeImportedCalendarEvents(){
+  const seen = new Map();
+  let removed = 0;
+  Object.values(state.calendarEvents).forEach(ev => {
+    if(!ev.googleEventId) return;
+    const key = eventContentKey(ev);
+    if(seen.has(key)){
+      delete state.calendarEvents[ev.id];
+      removed++;
+    } else {
+      seen.set(key, ev.id);
+    }
+  });
+  return removed;
 }
 function applyTheme(){
   const body = document.body;
@@ -1456,6 +1486,16 @@ function switchTopTab(tab){
   const searchEl = document.getElementById('searchInput');
   if(searchEl) searchEl.value = '';
   render();
+  // Keep the calendar fresh automatically whenever you open this tab —
+  // still just additive/local per syncGoogleCalendar's own rules.
+  if(tab === 'scheduling' && !calendarSyncing) syncGoogleCalendar();
+}
+function updateSyncRange(which, value){
+  const n = Math.max(0, Math.min(60, parseInt(value, 10) || 0));
+  if(which === 'past') state.calendarSyncRangePastMonths = n;
+  else state.calendarSyncRangeFutureMonths = n;
+  saveState();
+  render();
 }
 
 // ---- month grid math ----
@@ -1534,11 +1574,19 @@ function renderScheduling(){
       </div>
     </div>`;
 
+  html += `<div class="cal-range-setting">
+      <span>Sync range</span>
+      <input type="number" min="0" max="60" value="${state.calendarSyncRangePastMonths}" onchange="updateSyncRange('past', this.value)"> mo back
+      <span style="opacity:0.5;">—</span>
+      <input type="number" min="0" max="60" value="${state.calendarSyncRangeFutureMonths}" onchange="updateSyncRange('future', this.value)"> mo forward
+      <span style="opacity:0.6;">· auto-syncs every time you open this tab</span>
+    </div>`;
+
   html += `<div class="cal-grid"><div class="cal-weekday-row">
       <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
     </div>`;
+  html += `<div class="cal-body">`;
   weeks.forEach(week => {
-    html += `<div class="cal-week-row">`;
     week.forEach(cell => {
       const evs = eventsOnDate(cell.dateStr);
       const shown = evs.slice(0,3);
@@ -1553,9 +1601,8 @@ function renderScheduling(){
       if(extra > 0) html += `<div class="cal-more">+${extra} more</div>`;
       html += `</div></div>`;
     });
-    html += `</div>`;
   });
-  html += `</div>`;
+  html += `</div></div>`;
 
   html += `<div class="cal-legend">🔗 = imported from Google Calendar · edits here stay local and are never sent back to Google</div>`;
 
@@ -1721,8 +1768,10 @@ async function fetchGoogleCalendarList(){
   return calendars.filter(c => c.accessRole !== 'freeBusyReader');
 }
 async function fetchEventsForCalendar(calendarId){
-  const timeMin = new Date(); timeMin.setMonth(timeMin.getMonth() - 1);
-  const timeMax = new Date(); timeMax.setMonth(timeMax.getMonth() + 6);
+  const past = Number.isFinite(state.calendarSyncRangePastMonths) ? state.calendarSyncRangePastMonths : 1;
+  const future = Number.isFinite(state.calendarSyncRangeFutureMonths) ? state.calendarSyncRangeFutureMonths : 6;
+  const timeMin = new Date(); timeMin.setMonth(timeMin.getMonth() - past);
+  const timeMax = new Date(); timeMax.setMonth(timeMax.getMonth() + future);
   let items = [];
   let pageToken = null;
   let pages = 0;
@@ -1768,7 +1817,13 @@ async function syncGoogleCalendar(){
     const knownGoogleIds = new Set(
       Object.values(state.calendarEvents).map(e => e.googleEventId).filter(Boolean)
     );
-    let added = 0;
+    // Content fingerprints catch the same real-world event appearing on two
+    // different calendars (e.g. a birthday in both your primary calendar's
+    // auto-birthdays and the dedicated Birthdays calendar) — we only want it once.
+    const knownContentKeys = new Set(
+      Object.values(state.calendarEvents).filter(e => e.googleEventId).map(eventContentKey)
+    );
+    let added = 0, duplicatesSkipped = 0;
     entries.forEach(entry => {
       const item = entry.item;
       if(!item.id) return;
@@ -1777,14 +1832,18 @@ async function syncGoogleCalendar(){
       if(knownGoogleIds.has(key)) return; // already imported — never overwrite
       if(state.dismissedGoogleEventIds.includes(key)) return; // you deleted this locally before
       const local = mapGoogleEventToLocal(entry);
+      const contentKey = eventContentKey(local);
+      if(knownContentKeys.has(contentKey)){ duplicatesSkipped++; return; } // same event, seen via another calendar
       state.calendarEvents[local.id] = local;
       knownGoogleIds.add(key);
+      knownContentKeys.add(contentKey);
       added++;
     });
     state.calendarSync.lastSyncedAt = new Date().toISOString();
     let msg = added > 0
       ? `✓ Added ${added} new event${added!==1?'s':''} from ${calendarCount} calendar${calendarCount!==1?'s':''}`
       : `✓ Up to date across ${calendarCount} calendar${calendarCount!==1?'s':''} — no new events`;
+    if(duplicatesSkipped > 0) msg += ` (${duplicatesSkipped} duplicate${duplicatesSkipped!==1?'s':''} merged)`;
     if(failedCalendars > 0) msg += ` (${failedCalendars} calendar${failedCalendars!==1?'s':''} skipped — no access)`;
     calSyncStatusMsg = msg;
     saveState();
@@ -2187,7 +2246,7 @@ function handleImportFile(event){
       }
       if(!confirm('Import this backup? It will replace all data currently shown, and the merged result will be saved.')) return;
       state = Object.assign(
-        { categories:{}, tasks:{}, trash:[], theme: state.theme, nextXDays: state.nextXDays, collapsedSections: state.collapsedSections, calendarEvents:{}, dismissedGoogleEventIds:[], calendarSync:{lastSyncedAt:null} },
+        { categories:{}, tasks:{}, trash:[], theme: state.theme, nextXDays: state.nextXDays, collapsedSections: state.collapsedSections, calendarEvents:{}, dismissedGoogleEventIds:[], calendarSync:{lastSyncedAt:null}, calendarSyncRangePastMonths: state.calendarSyncRangePastMonths, calendarSyncRangeFutureMonths: state.calendarSyncRangeFutureMonths },
         parsed
       );
       migrateState();
