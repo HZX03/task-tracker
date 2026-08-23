@@ -270,6 +270,8 @@
   .cal-legend .dot{width:8px;height:8px;border-radius:50%;}
   .cal-daynum{cursor:pointer;}
   .cal-daynum:hover{background:rgba(47,143,209,0.35)!important;}
+  .cal-weekday-num{cursor:pointer;opacity:0.7;}
+  .cal-weekday-num:hover{text-decoration:underline;opacity:1;}
   .cal-week-body{height:520px;}
   .cal-day-agenda{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,0.28);min-height:300px;}
   .cal-day-agenda.today{border-color:var(--brass);}
@@ -280,6 +282,24 @@
   .cal-agenda-time{font-family:'JetBrains Mono';font-size:10.5px;color:var(--ink-soft);margin-bottom:3px;}
   .cal-agenda-title{font-size:14px;font-weight:600;color:var(--ink);}
   .cal-agenda-sub{font-family:'JetBrains Mono';font-size:11px;color:var(--ink-soft);margin-top:3px;}
+
+  /* Week/Day hour timeline */
+  .cal-timegrid-wrap{background:var(--paper);border:1px solid var(--line);border-radius:6px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.28);}
+  .cal-allday-row{display:flex;border-bottom:1px solid var(--line);background:rgba(47,143,209,0.05);}
+  .cal-allday-label-col{width:52px;flex-shrink:0;font-family:'JetBrains Mono';font-size:8.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);padding:8px 4px;text-align:right;}
+  .cal-allday-col{flex:1;border-right:1px solid var(--line);padding:5px;display:flex;flex-direction:column;gap:2px;min-height:30px;}
+  .cal-allday-col:last-child{border-right:none;}
+  .cal-timegrid-scroll{max-height:560px;overflow-y:auto;}
+  .cal-timegrid{display:flex;position:relative;}
+  .cal-hour-labels-col{width:52px;flex-shrink:0;position:relative;border-right:1px solid var(--line);background:var(--paper);}
+  .cal-hour-label{position:absolute;left:0;right:6px;text-align:right;font-family:'JetBrains Mono';font-size:9px;color:var(--ink-soft);transform:translateY(-50%);}
+  .cal-timegrid-cols{flex:1;display:flex;position:relative;}
+  .cal-timegrid-col{flex:1;position:relative;border-right:1px solid var(--line);cursor:pointer;min-width:0;}
+  .cal-timegrid-col:last-child{border-right:none;}
+  .cal-timegrid-col.today-col{background:rgba(47,143,209,0.05);}
+  .cal-hour-line{position:absolute;left:0;right:0;border-top:1px solid var(--line);opacity:0.5;pointer-events:none;}
+  .cal-timed-event{position:absolute;left:2px;right:2px;border-radius:3px;padding:2px 6px;color:#fff;font-family:'Inter';font-size:10.5px;overflow:hidden;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.3);line-height:1.3;}
+  .cal-timed-event .cal-event-time{display:block;font-family:'JetBrains Mono';font-size:8.5px;opacity:0.85;}
 
   @media (max-width:520px){
     .folder-grid{grid-template-columns:1fr 1fr;}
@@ -1649,6 +1669,70 @@ function fmtEventTime(t){
   const h12 = ((h+11)%12)+1;
   return `${h12}:${String(m).padStart(2,'0')}${ampm}`;
 }
+const HOUR_HEIGHT = 46; // px per hour in the week/day timeline
+function timeToMinutes(t){
+  if(!t) return 0;
+  const [h,m] = t.split(':').map(Number);
+  return (h||0)*60 + (m||0);
+}
+function hourLabel(h){
+  const ampm = h < 12 ? 'AM' : 'PM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12} ${ampm}`;
+}
+// Clicking empty space in the timeline opens a new event pre-filled with the
+// time you clicked, rounded to the nearest half hour — a small but useful
+// "zoom in and just start typing" shortcut.
+function handleTimegridClick(e, dateStr){
+  const rect = e.currentTarget.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  let totalMinutes = Math.round(((y / HOUR_HEIGHT) * 60) / 30) * 30;
+  totalMinutes = Math.max(0, Math.min(23*60+30, totalMinutes));
+  const h = Math.floor(totalMinutes/60), m = totalMinutes%60;
+  openNewEventModal(dateStr, `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+}
+function renderTimelineSection(columns, today){
+  const allDayHtml = columns.map(c => {
+    const evs = eventsOnDate(c.dateStr).filter(e => e.allDay);
+    const chips = evs.map(ev =>
+      `<div class="cal-event-chip" style="background:${ev.color}" title="${esc(ev.title)}" onclick="openEditEventModal('${ev.id}')">${esc(ev.title)}${ev.googleEventId?' 🔗':''}</div>`
+    ).join('');
+    return `<div class="cal-allday-col">${chips}</div>`;
+  }).join('');
+
+  let labelsHtml = '';
+  for(let h=0; h<24; h++){
+    labelsHtml += `<div class="cal-hour-label" style="top:${h*HOUR_HEIGHT}px">${hourLabel(h)}</div>`;
+  }
+
+  const colsHtml = columns.map(c => {
+    const evs = eventsOnDate(c.dateStr).filter(e => !e.allDay);
+    let inner = '';
+    for(let h=0; h<24; h++){ inner += `<div class="cal-hour-line" style="top:${h*HOUR_HEIGHT}px"></div>`; }
+    evs.forEach(ev => {
+      const startMin = timeToMinutes(ev.startTime);
+      let endMin = timeToMinutes(ev.endTime);
+      if(endMin <= startMin) endMin = startMin + 30;
+      const top = (startMin/60)*HOUR_HEIGHT;
+      const height = Math.max(18, ((endMin-startMin)/60)*HOUR_HEIGHT);
+      inner += `<div class="cal-timed-event" style="top:${top}px;height:${height}px;background:${ev.color}" title="${esc(ev.title)}" onclick="event.stopPropagation(); openEditEventModal('${ev.id}')"><span class="cal-event-time">${fmtEventTime(ev.startTime)}</span>${esc(ev.title)}${ev.googleEventId?' 🔗':''}</div>`;
+    });
+    return `<div class="cal-timegrid-col ${c.dateStr===today?'today-col':''}" onclick="handleTimegridClick(event,'${c.dateStr}')">${inner}</div>`;
+  }).join('');
+
+  return `<div class="cal-timegrid-wrap">
+      <div class="cal-allday-row">
+        <div class="cal-allday-label-col">All-day</div>
+        ${allDayHtml}
+      </div>
+      <div class="cal-timegrid-scroll" id="calTimegridScroll">
+        <div class="cal-timegrid">
+          <div class="cal-hour-labels-col" style="height:${24*HOUR_HEIGHT}px">${labelsHtml}</div>
+          <div class="cal-timegrid-cols" style="height:${24*HOUR_HEIGHT}px">${colsHtml}</div>
+        </div>
+      </div>
+    </div>`;
+}
 
 function renderScheduling(){
   const main = document.getElementById('main');
@@ -1693,6 +1777,13 @@ function renderScheduling(){
   html += `<div class="cal-legend">🔗 = imported from Google Calendar · edits here stay local and are never sent back to Google · click a date number to zoom in</div>`;
 
   main.innerHTML = html;
+
+  // Scroll the timeline to a sensible starting point (mid-morning) rather
+  // than dumping the person at midnight every time they open week/day view.
+  if(calViewMode === 'week' || calViewMode === 'day'){
+    const scrollEl = document.getElementById('calTimegridScroll');
+    if(scrollEl) scrollEl.scrollTop = Math.max(0, 7*HOUR_HEIGHT - 30);
+  }
 }
 
 function renderMonthView(today){
@@ -1726,58 +1817,15 @@ function renderWeekView(today){
   const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   let html = `<div class="cal-grid"><div class="cal-weekday-row">`;
   days.forEach((d,i) => {
-    const dt = new Date(d.dateStr + 'T00:00:00');
-    html += `<div>${dayNames[i]} <span class="mono" style="opacity:0.7">${dt.getDate()}</span></div>`;
-  });
-  html += `</div>`;
-  html += `<div class="cal-body cal-week-body">`;
-  days.forEach(cell => {
-    const evs = eventsOnDate(cell.dateStr);
-    const shown = evs.slice(0,8);
-    const extra = evs.length - shown.length;
-    html += `<div class="cal-day ${cell.dateStr===today?'today':''}" onclick="openNewEventModal('${cell.dateStr}')">
-        <div class="cal-daynum" onclick="event.stopPropagation(); zoomToDay('${cell.dateStr}')" title="View this day">${cell.day}</div>
-        <div class="cal-events">`;
-    shown.forEach(ev => {
-      const timeLabel = ev.allDay ? '' : `<span class="cal-event-time">${fmtEventTime(ev.startTime)}</span>`;
-      html += `<div class="cal-event-chip" style="background:${ev.color}" title="${esc(ev.title)}" onclick="event.stopPropagation(); openEditEventModal('${ev.id}')">${timeLabel}${esc(ev.title)}${ev.googleEventId?' 🔗':''}</div>`;
-    });
-    if(extra > 0) html += `<div class="cal-more" onclick="event.stopPropagation(); zoomToDay('${cell.dateStr}')">+${extra} more</div>`;
-    html += `</div></div>`;
+    html += `<div>${dayNames[i]} <span class="mono cal-weekday-num" onclick="zoomToDay('${d.dateStr}')" title="View this day">${d.day}</span></div>`;
   });
   html += `</div></div>`;
+  html += renderTimelineSection(days.map(d => ({ dateStr: d.dateStr })), today);
   return html;
 }
 
 function renderDayView(today){
-  const evs = eventsOnDate(calSelectedDate);
-  const allDayEvs = evs.filter(e => e.allDay);
-  const timedEvs = evs.filter(e => !e.allDay);
-  let html = `<div class="cal-day-agenda ${calSelectedDate===today?'today':''}">`;
-  if(allDayEvs.length){
-    html += `<div class="cal-agenda-section-label">All day</div>`;
-    allDayEvs.forEach(ev => {
-      html += `<div class="cal-agenda-item" style="border-left-color:${ev.color}" onclick="openEditEventModal('${ev.id}')">
-          <div class="cal-agenda-title">${esc(ev.title)}${ev.googleEventId?' 🔗':''}</div>
-          ${ev.location ? `<div class="cal-agenda-sub">📍 ${esc(ev.location)}</div>` : ''}
-        </div>`;
-    });
-  }
-  if(timedEvs.length){
-    html += `<div class="cal-agenda-section-label">Schedule</div>`;
-    timedEvs.forEach(ev => {
-      html += `<div class="cal-agenda-item" style="border-left-color:${ev.color}" onclick="openEditEventModal('${ev.id}')">
-          <div class="cal-agenda-time">${fmtEventTime(ev.startTime)} – ${fmtEventTime(ev.endTime)}</div>
-          <div class="cal-agenda-title">${esc(ev.title)}${ev.googleEventId?' 🔗':''}</div>
-          ${ev.location ? `<div class="cal-agenda-sub">📍 ${esc(ev.location)}</div>` : ''}
-        </div>`;
-    });
-  }
-  if(!allDayEvs.length && !timedEvs.length){
-    html += `<div class="empty-note">Nothing scheduled for this day.</div>`;
-  }
-  html += `</div>`;
-  return html;
+  return renderTimelineSection([{ dateStr: calSelectedDate }], today);
 }
 
 // ---- Event modal ----
@@ -1793,7 +1841,7 @@ function toggleEventAllDayFields(){
   document.getElementById('eventStartTimeWrap').style.display = allDay ? 'none' : '';
   document.getElementById('eventEndTimeWrap').style.display = allDay ? 'none' : '';
 }
-function openNewEventModal(dateStr){
+function openNewEventModal(dateStr, timeStr){
   eventModalCtx = { mode:'create' };
   selectedEventColor = EVENT_COLORS[0];
   document.getElementById('eventModalTitle').textContent = 'New Event';
@@ -1802,8 +1850,14 @@ function openNewEventModal(dateStr){
   document.getElementById('eventAllDay').checked = false;
   document.getElementById('eventStartDate').value = dateStr || todayStr();
   document.getElementById('eventEndDate').value = dateStr || todayStr();
-  document.getElementById('eventStartTime').value = '09:00';
-  document.getElementById('eventEndTime').value = '10:00';
+  const startTime = timeStr || '09:00';
+  document.getElementById('eventStartTime').value = startTime;
+  let endTime = '10:00';
+  if(timeStr){
+    const endMin = Math.min(23*60+59, timeToMinutes(timeStr) + 60);
+    endTime = `${String(Math.floor(endMin/60)).padStart(2,'0')}:${String(endMin%60).padStart(2,'0')}`;
+  }
+  document.getElementById('eventEndTime').value = endTime;
   document.getElementById('eventLocation').value = '';
   document.getElementById('eventDescription').value = '';
   document.getElementById('eventDeleteBtn').style.display = 'none';
