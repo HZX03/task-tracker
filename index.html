@@ -228,10 +228,46 @@
   .sign-out-btn{background:transparent;border:1px solid var(--brass);color:var(--page-text-soft);padding:8px 12px;border-radius:3px;font-size:11px;font-family:'JetBrains Mono';}
   .sign-out-btn:hover{background:rgba(47,143,209,0.15);}
 
+  /* Top-level tabs */
+  .top-tabs{max-width:1040px;margin:16px auto 0;display:flex;gap:8px;}
+  .top-tab-btn{font-family:'JetBrains Mono';font-size:12px;letter-spacing:0.5px;padding:9px 16px;border:1px solid var(--brass);border-radius:3px 3px 0 0;background:transparent;color:var(--page-text-soft);border-bottom:none;position:relative;top:1px;}
+  .top-tab-btn:hover{background:rgba(47,143,209,0.15);}
+  .top-tab-btn.active{background:var(--paper);color:var(--ink);font-weight:600;border-bottom:1px solid var(--paper);}
+
+  /* Scheduling / calendar clone */
+  .cal-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
+  .cal-toolbar-left{display:flex;align-items:center;gap:10px;}
+  .cal-toolbar-left h2{font-family:'Space Grotesk';font-size:19px;margin:0;min-width:170px;color:var(--page-text);}
+  .cal-nav-btn{background:transparent;border:1px solid var(--brass);color:var(--page-text-soft);width:30px;height:30px;border-radius:3px;font-size:13px;}
+  .cal-nav-btn:hover{background:rgba(47,143,209,0.15);}
+  .cal-toolbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .cal-sync-status{font-family:'JetBrains Mono';font-size:10.5px;color:var(--page-text-soft);opacity:0.85;}
+  .cal-grid{background:var(--paper);border:1px solid var(--line);border-radius:6px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.28);}
+  .cal-weekday-row{display:grid;grid-template-columns:repeat(7,1fr);background:rgba(47,143,209,0.1);}
+  .cal-weekday-row div{font-family:'JetBrains Mono';font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--brass);padding:8px 6px;text-align:center;}
+  .cal-week-row{display:grid;grid-template-columns:repeat(7,1fr);}
+  .cal-day{min-height:96px;border-top:1px solid var(--line);border-right:1px solid var(--line);padding:6px;cursor:pointer;display:flex;flex-direction:column;gap:3px;position:relative;}
+  .cal-week-row .cal-day:last-child{border-right:none;}
+  .cal-day:hover{background:rgba(47,143,209,0.06);}
+  .cal-day.other-month{opacity:0.38;}
+  .cal-day.today .cal-daynum{background:var(--brass);color:var(--paper-dark-2);}
+  .cal-daynum{font-family:'JetBrains Mono';font-size:11px;color:var(--ink-soft);width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+  .cal-events{display:flex;flex-direction:column;gap:2px;overflow:hidden;}
+  .cal-event-chip{font-family:'Inter';font-size:10.5px;padding:2px 5px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;line-height:1.5;}
+  .cal-event-chip .cal-event-time{opacity:0.85;font-family:'JetBrains Mono';font-size:9px;margin-right:3px;}
+  .cal-more{font-family:'JetBrains Mono';font-size:9.5px;color:var(--brass);padding:1px 5px;}
+  .cal-color-swatches{display:flex;gap:7px;margin-top:2px;}
+  .cal-color-swatch{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;}
+  .cal-color-swatch.selected{border-color:var(--ink);}
+  .cal-legend{font-family:'JetBrains Mono';font-size:10px;color:var(--ink-soft);margin-top:6px;display:inline-flex;align-items:center;gap:5px;}
+  .cal-legend .dot{width:8px;height:8px;border-radius:50%;}
+
   @media (max-width:520px){
     .folder-grid{grid-template-columns:1fr 1fr;}
     .task-top{flex-wrap:wrap;}
     .masthead{flex-direction:column;align-items:flex-start;}
+    .cal-day{min-height:64px;}
+    .cal-toolbar-left h2{min-width:0;font-size:16px;}
   }
 </style>
 </head>
@@ -265,7 +301,42 @@
   <div class="breadcrumb" id="breadcrumb"></div>
 </header>
 
+<div class="top-tabs" id="topTabs">
+  <button class="top-tab-btn" id="tabBtnHome" onclick="switchTopTab('home')">🏠 Home</button>
+  <button class="top-tab-btn" id="tabBtnScheduling" onclick="switchTopTab('scheduling')">📅 Scheduling</button>
+</div>
+
 <main id="main"></main>
+
+<!-- Event Modal (Scheduling) -->
+<div class="modal-overlay" id="eventModalOverlay">
+  <div class="modal">
+    <h2 id="eventModalTitle">New Event</h2>
+    <div class="modal-sub" id="eventModalSub">Lives only in this app's calendar — never written back to Google Calendar.</div>
+    <div class="field"><label>Title</label><input id="eventTitle" type="text" placeholder="e.g. Dentist appointment"></div>
+    <div class="field"><label class="checkbox-label"><input type="checkbox" id="eventAllDay" onchange="toggleEventAllDayFields()"> All-day event</label></div>
+    <div class="field" style="display:flex;gap:10px;">
+      <div style="flex:1;"><div class="mono" style="font-size:10px;color:var(--ink-soft);margin-bottom:4px;">Start Date</div><input id="eventStartDate" type="date"></div>
+      <div style="flex:1;" id="eventStartTimeWrap"><div class="mono" style="font-size:10px;color:var(--ink-soft);margin-bottom:4px;">Start Time</div><input id="eventStartTime" type="time"></div>
+    </div>
+    <div class="field" style="display:flex;gap:10px;">
+      <div style="flex:1;"><div class="mono" style="font-size:10px;color:var(--ink-soft);margin-bottom:4px;">End Date</div><input id="eventEndDate" type="date"></div>
+      <div style="flex:1;" id="eventEndTimeWrap"><div class="mono" style="font-size:10px;color:var(--ink-soft);margin-bottom:4px;">End Time</div><input id="eventEndTime" type="time"></div>
+    </div>
+    <div class="field"><label>Location</label><input id="eventLocation" type="text" placeholder="Optional"></div>
+    <div class="field"><label>Description</label><textarea id="eventDescription" placeholder="Optional notes"></textarea></div>
+    <div class="field">
+      <label>Color</label>
+      <div class="cal-color-swatches" id="eventColorSwatches"></div>
+    </div>
+    <div id="eventGoogleNote" class="mono" style="display:none;font-size:11px;color:var(--page-text-soft);margin:-4px 0 14px;">🔗 Originally imported from Google Calendar. Editing this only changes the copy in this app.</div>
+    <div class="modal-actions">
+      <button class="btn danger" id="eventDeleteBtn" onclick="deleteEventFromModal()" style="display:none;margin-right:auto;">Delete</button>
+      <button class="btn ghost" onclick="closeModal('eventModalOverlay')">Cancel</button>
+      <button class="btn" onclick="submitEventModal()">Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- Category Modal -->
 <div class="modal-overlay" id="categoryModalOverlay">
@@ -337,9 +408,10 @@
 // ---------------------------------------------------------------------
 // STATE
 // ---------------------------------------------------------------------
-let state = { categories: {}, tasks: {}, trash: [], theme: 'dark', nextXDays: 3, collapsedSections: {} };
+let state = { categories: {}, tasks: {}, trash: [], theme: 'dark', nextXDays: 3, collapsedSections: {}, calendarEvents: {}, dismissedGoogleEventIds: [], calendarSync: { lastSyncedAt: null } };
 let currentCategoryId = null;   // null = root/home
 let viewMode = 'browse';        // 'browse' | 'trash'
+let topTab = 'home';            // 'home' | 'scheduling'
 let searchQuery = '';
 let expandedNodes = new Set();  // keys: `${taskId}|${pathIds.join(',')}`
 let pendingNodeType = 'doby';
@@ -448,6 +520,10 @@ function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
 // ---------------------------------------------------------------------
 const GOOGLE_CLIENT_ID = '210912226684-l0btp1egeoakjn4ujm7flkq7nj5jsak2.apps.googleusercontent.com';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+// Read-only on purpose: this app can pull events IN from Google Calendar,
+// but this scope makes it structurally impossible to write anything back out.
+const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+const AUTH_SCOPES = DRIVE_SCOPE + ' ' + CALENDAR_SCOPE;
 const DRIVE_FILE_NAME = 'task-tracking-data.json';
 const DRIVE_FOLDER_NAME = 'Task Tracker';
 // This app is for one person only — hinting the account skips Google's
@@ -474,7 +550,7 @@ function waitForGoogleIdentity(cb, attempts){
 function initGoogleAuth(){
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
-    scope: DRIVE_SCOPE,
+    scope: AUTH_SCOPES,
     hint: GOOGLE_ACCOUNT_HINT || undefined,
     callback: (tokenResponse) => {
       if(tokenResponse && tokenResponse.access_token){
@@ -642,7 +718,7 @@ async function loadState(){
         const text = await driveGetFileContent(driveFileId);
         if(text){
           const parsed = JSON.parse(text);
-          state = Object.assign({categories:{}, tasks:{}, trash:[], theme:'dark', nextXDays:3, collapsedSections:{}}, parsed);
+          state = Object.assign({categories:{}, tasks:{}, trash:[], theme:'dark', nextXDays:3, collapsedSections:{}, calendarEvents:{}, dismissedGoogleEventIds:[], calendarSync:{lastSyncedAt:null}}, parsed);
         }
       }
       loaded = true;
@@ -697,6 +773,10 @@ function migrateState(){
   if(!state.collapsedSections || typeof state.collapsedSections !== 'object') state.collapsedSections = {};
   Object.values(state.tasks).forEach(ensureNodeShape);
   Object.values(state.categories).forEach(c => { if(c.description === undefined) c.description = ''; });
+  if(!state.calendarEvents || typeof state.calendarEvents !== 'object') state.calendarEvents = {};
+  if(!Array.isArray(state.dismissedGoogleEventIds)) state.dismissedGoogleEventIds = [];
+  if(!state.calendarSync || typeof state.calendarSync !== 'object') state.calendarSync = { lastSyncedAt: null };
+  Object.values(state.calendarEvents).forEach(ensureEventShape);
 }
 function applyTheme(){
   const body = document.body;
@@ -1329,8 +1409,341 @@ function fmtPeriod(period){
   return `${fmtDate(period.start)} → ${fmtDate(period.end)}`;
 }
 
+// ---------------------------------------------------------------------
+// SCHEDULING / GOOGLE-CALENDAR-CLONE
+//
+// Events live entirely in state.calendarEvents and are saved the same way
+// as everything else (via saveState() -> the Drive JSON file). Editing or
+// deleting an event here — including ones that were imported from Google —
+// ONLY ever changes this local copy. We never call a Google Calendar write
+// endpoint, and the OAuth scope we request (calendar.readonly) makes that
+// impossible even by mistake. "Sync" is one-directional and additive: it
+// pulls events from Google that we haven't seen before (by their Google
+// event id) and adds them here; it never touches or overwrites an event
+// that already exists locally, whether that event originated from Google
+// or was created in this app.
+// ---------------------------------------------------------------------
+const EVENT_COLORS = ['#2f8fd1','#22a878','#d1552f','#8860c4','#c99a2e','#4a90a4'];
+let calCursor = (() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; })();
+let eventModalCtx = null;   // {mode:'create'|'edit', id?, defaultDate?}
+let selectedEventColor = EVENT_COLORS[0];
+let calendarSyncing = false;
+let calSyncStatusMsg = '';
+
+function ensureEventShape(ev){
+  if(!ev || typeof ev !== 'object') return;
+  if(typeof ev.id !== 'string') ev.id = uid();
+  if(ev.googleEventId === undefined) ev.googleEventId = null;
+  if(typeof ev.title !== 'string') ev.title = '(untitled event)';
+  if(typeof ev.description !== 'string') ev.description = '';
+  if(typeof ev.location !== 'string') ev.location = '';
+  if(typeof ev.allDay !== 'boolean') ev.allDay = !ev.startTime;
+  if(typeof ev.startDate !== 'string') ev.startDate = todayStr();
+  if(typeof ev.endDate !== 'string') ev.endDate = ev.startDate;
+  if(ev.allDay){ ev.startTime = null; ev.endTime = null; }
+  else {
+    if(typeof ev.startTime !== 'string') ev.startTime = '09:00';
+    if(typeof ev.endTime !== 'string') ev.endTime = ev.startTime;
+  }
+  if(!EVENT_COLORS.includes(ev.color)) ev.color = EVENT_COLORS[0];
+}
+
+function switchTopTab(tab){
+  topTab = tab;
+  viewMode = 'browse';
+  searchQuery = '';
+  const searchEl = document.getElementById('searchInput');
+  if(searchEl) searchEl.value = '';
+  render();
+}
+
+// ---- month grid math ----
+function calMonthLabel(){
+  const d = new Date(calCursor.year, calCursor.month, 1);
+  return d.toLocaleDateString(undefined, { month:'long', year:'numeric' });
+}
+function calPrevMonth(){
+  calCursor.month--; if(calCursor.month < 0){ calCursor.month = 11; calCursor.year--; }
+  render();
+}
+function calNextMonth(){
+  calCursor.month++; if(calCursor.month > 11){ calCursor.month = 0; calCursor.year++; }
+  render();
+}
+function calGoToday(){
+  const d = new Date(); calCursor = { year: d.getFullYear(), month: d.getMonth() };
+  render();
+}
+function dstr(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+function buildMonthGrid(year, month){
+  const firstOfMonth = new Date(year, month, 1);
+  const startOffset = firstOfMonth.getDay(); // 0=Sun
+  const gridStart = new Date(year, month, 1 - startOffset);
+  const weeks = [];
+  let cursor = new Date(gridStart);
+  for(let w=0; w<6; w++){
+    const week = [];
+    for(let d=0; d<7; d++){
+      week.push({
+        dateStr: dstr(cursor.getFullYear(), cursor.getMonth(), cursor.getDate()),
+        day: cursor.getDate(),
+        inMonth: cursor.getMonth() === month
+      });
+      cursor.setDate(cursor.getDate()+1);
+    }
+    weeks.push(week);
+  }
+  return weeks;
+}
+function eventsOnDate(dateStr){
+  return Object.values(state.calendarEvents)
+    .filter(ev => ev.startDate <= dateStr && dateStr <= ev.endDate)
+    .sort((a,b) => {
+      if(a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+      return String(a.startTime||'').localeCompare(String(b.startTime||'')) || a.title.localeCompare(b.title);
+    });
+}
+function fmtEventTime(t){
+  if(!t) return '';
+  const [h,m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = ((h+11)%12)+1;
+  return `${h12}:${String(m).padStart(2,'0')}${ampm}`;
+}
+
+function renderScheduling(){
+  const main = document.getElementById('main');
+  const weeks = buildMonthGrid(calCursor.year, calCursor.month);
+  const today = todayStr();
+  const lastSync = state.calendarSync && state.calendarSync.lastSyncedAt
+    ? new Date(state.calendarSync.lastSyncedAt).toLocaleString()
+    : 'never';
+
+  let html = `<div class="cal-toolbar">
+      <div class="cal-toolbar-left">
+        <button class="cal-nav-btn" onclick="calPrevMonth()">‹</button>
+        <button class="cal-nav-btn" onclick="calNextMonth()">›</button>
+        <h2>${calMonthLabel()}</h2>
+        <button class="btn subtle small" onclick="calGoToday()">Today</button>
+      </div>
+      <div class="cal-toolbar-right">
+        <span class="cal-sync-status">${calendarSyncing ? '⏳ Syncing…' : (calSyncStatusMsg || `Last synced: ${esc(lastSync)}`)}</span>
+        <button class="btn ghost small" onclick="syncGoogleCalendar()" ${calendarSyncing?'disabled':''}>🔄 Sync from Google Calendar</button>
+        <button class="btn small" onclick="openNewEventModal('${today}')">+ New Event</button>
+      </div>
+    </div>`;
+
+  html += `<div class="cal-grid"><div class="cal-weekday-row">
+      <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+    </div>`;
+  weeks.forEach(week => {
+    html += `<div class="cal-week-row">`;
+    week.forEach(cell => {
+      const evs = eventsOnDate(cell.dateStr);
+      const shown = evs.slice(0,3);
+      const extra = evs.length - shown.length;
+      html += `<div class="cal-day ${cell.inMonth?'':'other-month'} ${cell.dateStr===today?'today':''}" onclick="openNewEventModal('${cell.dateStr}')">
+          <div class="cal-daynum">${cell.day}</div>
+          <div class="cal-events">`;
+      shown.forEach(ev => {
+        const timeLabel = ev.allDay ? '' : `<span class="cal-event-time">${fmtEventTime(ev.startTime)}</span>`;
+        html += `<div class="cal-event-chip" style="background:${ev.color}" title="${esc(ev.title)}" onclick="event.stopPropagation(); openEditEventModal('${ev.id}')">${timeLabel}${esc(ev.title)}${ev.googleEventId?' 🔗':''}</div>`;
+      });
+      if(extra > 0) html += `<div class="cal-more">+${extra} more</div>`;
+      html += `</div></div>`;
+    });
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  html += `<div class="cal-legend">🔗 = imported from Google Calendar · edits here stay local and are never sent back to Google</div>`;
+
+  main.innerHTML = html;
+}
+
+// ---- Event modal ----
+function renderEventColorSwatches(){
+  const wrap = document.getElementById('eventColorSwatches');
+  wrap.innerHTML = EVENT_COLORS.map(c =>
+    `<div class="cal-color-swatch ${c===selectedEventColor?'selected':''}" style="background:${c}" onclick="selectEventColor('${c}')"></div>`
+  ).join('');
+}
+function selectEventColor(c){ selectedEventColor = c; renderEventColorSwatches(); }
+function toggleEventAllDayFields(){
+  const allDay = document.getElementById('eventAllDay').checked;
+  document.getElementById('eventStartTimeWrap').style.display = allDay ? 'none' : '';
+  document.getElementById('eventEndTimeWrap').style.display = allDay ? 'none' : '';
+}
+function openNewEventModal(dateStr){
+  eventModalCtx = { mode:'create' };
+  selectedEventColor = EVENT_COLORS[0];
+  document.getElementById('eventModalTitle').textContent = 'New Event';
+  document.getElementById('eventModalSub').textContent = "Lives only in this app's calendar — never written back to Google Calendar.";
+  document.getElementById('eventTitle').value = '';
+  document.getElementById('eventAllDay').checked = false;
+  document.getElementById('eventStartDate').value = dateStr || todayStr();
+  document.getElementById('eventEndDate').value = dateStr || todayStr();
+  document.getElementById('eventStartTime').value = '09:00';
+  document.getElementById('eventEndTime').value = '10:00';
+  document.getElementById('eventLocation').value = '';
+  document.getElementById('eventDescription').value = '';
+  document.getElementById('eventDeleteBtn').style.display = 'none';
+  document.getElementById('eventGoogleNote').style.display = 'none';
+  toggleEventAllDayFields();
+  renderEventColorSwatches();
+  openModal('eventModalOverlay');
+}
+function openEditEventModal(id){
+  const ev = state.calendarEvents[id];
+  if(!ev) return;
+  eventModalCtx = { mode:'edit', id };
+  selectedEventColor = ev.color;
+  document.getElementById('eventModalTitle').textContent = 'Edit Event';
+  document.getElementById('eventModalSub').textContent = "Changes save only to this app's calendar.";
+  document.getElementById('eventTitle').value = ev.title;
+  document.getElementById('eventAllDay').checked = ev.allDay;
+  document.getElementById('eventStartDate').value = ev.startDate;
+  document.getElementById('eventEndDate').value = ev.endDate;
+  document.getElementById('eventStartTime').value = ev.startTime || '09:00';
+  document.getElementById('eventEndTime').value = ev.endTime || '10:00';
+  document.getElementById('eventLocation').value = ev.location;
+  document.getElementById('eventDescription').value = ev.description;
+  document.getElementById('eventDeleteBtn').style.display = '';
+  document.getElementById('eventGoogleNote').style.display = ev.googleEventId ? '' : 'none';
+  toggleEventAllDayFields();
+  renderEventColorSwatches();
+  openModal('eventModalOverlay');
+}
+function submitEventModal(){
+  if(!eventModalCtx) return;
+  const title = document.getElementById('eventTitle').value.trim();
+  if(!title){ alert('Please give the event a title.'); return; }
+  const allDay = document.getElementById('eventAllDay').checked;
+  const startDate = document.getElementById('eventStartDate').value || todayStr();
+  let endDate = document.getElementById('eventEndDate').value || startDate;
+  if(endDate < startDate) endDate = startDate;
+  const startTime = allDay ? null : (document.getElementById('eventStartTime').value || '09:00');
+  const endTime = allDay ? null : (document.getElementById('eventEndTime').value || startTime);
+  const location = document.getElementById('eventLocation').value.trim();
+  const description = document.getElementById('eventDescription').value.trim();
+
+  if(eventModalCtx.mode === 'create'){
+    const ev = {
+      id: uid(), googleEventId: null, title, description, location,
+      allDay, startDate, endDate, startTime, endTime, color: selectedEventColor
+    };
+    state.calendarEvents[ev.id] = ev;
+  } else {
+    const ev = state.calendarEvents[eventModalCtx.id];
+    if(ev){
+      Object.assign(ev, { title, description, location, allDay, startDate, endDate, startTime, endTime, color: selectedEventColor });
+      // googleEventId is intentionally left untouched — this is still "the same"
+      // event as far as future syncs are concerned, just edited locally.
+    }
+  }
+  eventModalCtx = null;
+  saveState();
+  closeModal('eventModalOverlay');
+  render();
+}
+function deleteEventFromModal(){
+  if(!eventModalCtx || eventModalCtx.mode !== 'edit') return;
+  const ev = state.calendarEvents[eventModalCtx.id];
+  if(!ev) return;
+  if(!confirm(`Delete "${ev.title}"? This only removes it from this app.`)) return;
+  if(ev.googleEventId && !state.dismissedGoogleEventIds.includes(ev.googleEventId)){
+    // Remember this so a future sync doesn't just re-add the event you deleted.
+    state.dismissedGoogleEventIds.push(ev.googleEventId);
+  }
+  delete state.calendarEvents[eventModalCtx.id];
+  eventModalCtx = null;
+  saveState();
+  closeModal('eventModalOverlay');
+  render();
+}
+
+// ---- One-directional, additive sync from Google Calendar ----
+function mapGoogleEventToLocal(item){
+  const startAllDay = item.start && item.start.date;
+  const allDay = !!startAllDay;
+  const startDate = allDay ? item.start.date : (item.start.dateTime || '').slice(0,10);
+  let endDate = allDay ? item.end.date : (item.end.dateTime || '').slice(0,10);
+  // Google's all-day "end.date" is exclusive (the day after the event ends) —
+  // pull it back one day so it matches what's shown on the calendar.
+  if(allDay && endDate){ endDate = addDaysStr(endDate, -1); }
+  if(!endDate || endDate < startDate) endDate = startDate;
+  const startTime = allDay ? null : (item.start.dateTime || '').slice(11,16);
+  const endTime = allDay ? null : (item.end.dateTime || '').slice(11,16);
+  return {
+    id: uid(),
+    googleEventId: item.id,
+    title: item.summary || '(untitled event)',
+    description: item.description || '',
+    location: item.location || '',
+    allDay, startDate, endDate,
+    startTime: startTime || '09:00',
+    endTime: endTime || (startTime || '10:00'),
+    color: EVENT_COLORS[0]
+  };
+}
+async function fetchGoogleCalendarEvents(){
+  const timeMin = new Date(); timeMin.setMonth(timeMin.getMonth() - 1);
+  const timeMax = new Date(); timeMax.setMonth(timeMax.getMonth() + 6);
+  let items = [];
+  let pageToken = null;
+  let pages = 0;
+  do {
+    const params = new URLSearchParams({
+      timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString(),
+      singleEvents: 'true', orderBy: 'startTime', maxResults: '250'
+    });
+    if(pageToken) params.set('pageToken', pageToken);
+    const res = await driveFetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`);
+    if(!res.ok) throw new Error('Calendar fetch failed: ' + res.status);
+    const data = await res.json();
+    items = items.concat(data.items || []);
+    pageToken = data.nextPageToken || null;
+    pages++;
+  } while(pageToken && pages < 10);
+  return items;
+}
+async function syncGoogleCalendar(){
+  if(calendarSyncing) return;
+  calendarSyncing = true;
+  calSyncStatusMsg = '';
+  render();
+  try{
+    const items = await fetchGoogleCalendarEvents();
+    const knownGoogleIds = new Set(
+      Object.values(state.calendarEvents).map(e => e.googleEventId).filter(Boolean)
+    );
+    let added = 0;
+    items.forEach(item => {
+      if(!item.id) return;
+      if(item.status === 'cancelled') return;
+      if(knownGoogleIds.has(item.id)) return; // already imported — never overwrite
+      if(state.dismissedGoogleEventIds.includes(item.id)) return; // you deleted this locally before
+      const local = mapGoogleEventToLocal(item);
+      state.calendarEvents[local.id] = local;
+      knownGoogleIds.add(item.id);
+      added++;
+    });
+    state.calendarSync.lastSyncedAt = new Date().toISOString();
+    calSyncStatusMsg = added > 0 ? `✓ Added ${added} new event${added!==1?'s':''} from Google Calendar` : '✓ Up to date — no new events found';
+    saveState();
+  }catch(e){
+    console.error('Calendar sync failed:', e);
+    calSyncStatusMsg = '⚠ Sync failed — try again in a moment';
+  }
+  calendarSyncing = false;
+  render();
+}
+
 function render(){
   renderBreadcrumb();
+  document.getElementById('tabBtnHome').classList.toggle('active', topTab === 'home');
+  document.getElementById('tabBtnScheduling').classList.toggle('active', topTab === 'scheduling');
+  if(topTab === 'scheduling'){ renderScheduling(); return; }
   if(viewMode === 'trash') renderTrash();
   else if(searchQuery.trim() !== '') renderSearchResults();
   else renderMain();
@@ -1342,6 +1755,11 @@ function renderBreadcrumb(){
   purgeExpiredTrash();
   if(state.trash.length > 0){ badge.style.display='inline'; badge.textContent = state.trash.length; }
   else badge.style.display = 'none';
+
+  if(topTab === 'scheduling'){
+    el.innerHTML = `<span class="crumb" onclick="switchTopTab('home')">🏠 Home</span><span class="sep">/</span><span class="crumb current">📅 Scheduling</span>`;
+    return;
+  }
 
   if(viewMode === 'trash'){
     el.innerHTML = `<span class="crumb" onclick="closeTrashView()">🏠 Home</span><span class="sep">/</span><span class="crumb current">🗑 Recycling Bin</span>`;
@@ -1712,7 +2130,7 @@ function handleImportFile(event){
       }
       if(!confirm('Import this backup? It will replace all data currently shown, and the merged result will be saved.')) return;
       state = Object.assign(
-        { categories:{}, tasks:{}, trash:[], theme: state.theme, nextXDays: state.nextXDays, collapsedSections: state.collapsedSections },
+        { categories:{}, tasks:{}, trash:[], theme: state.theme, nextXDays: state.nextXDays, collapsedSections: state.collapsedSections, calendarEvents:{}, dismissedGoogleEventIds:[], calendarSync:{lastSyncedAt:null} },
         parsed
       );
       migrateState();
@@ -1802,7 +2220,8 @@ document.addEventListener('keydown', (e) => {
   }
   if(e.key === 'n' || e.key === 'N'){
     e.preventDefault();
-    if(viewMode === 'browse' && currentCategoryId !== null) openNewTaskModal();
+    if(topTab === 'scheduling') openNewEventModal(todayStr());
+    else if(viewMode === 'browse' && currentCategoryId !== null) openNewTaskModal();
     else if(viewMode === 'browse') openCategoryModal();
   }
 });
