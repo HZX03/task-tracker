@@ -1446,6 +1446,7 @@ function ensureEventShape(ev){
     if(typeof ev.endTime !== 'string') ev.endTime = ev.startTime;
   }
   if(!EVENT_COLORS.includes(ev.color)) ev.color = EVENT_COLORS[0];
+  if(typeof ev.calendarSummary !== 'string') ev.calendarSummary = '';
 }
 
 function switchTopTab(tab){
@@ -1610,6 +1611,9 @@ function openEditEventModal(id){
   document.getElementById('eventDescription').value = ev.description;
   document.getElementById('eventDeleteBtn').style.display = '';
   document.getElementById('eventGoogleNote').style.display = ev.googleEventId ? '' : 'none';
+  document.getElementById('eventGoogleNote').textContent = ev.googleEventId
+    ? `🔗 Originally imported from Google Calendar${ev.calendarSummary ? ' ("'+ev.calendarSummary+'")' : ''}. Editing this only changes the copy in this app.`
+    : '';
   toggleEventAllDayFields();
   renderEventColorSwatches();
   openModal('eventModalOverlay');
@@ -1662,10 +1666,22 @@ function deleteEventFromModal(){
   render();
 }
 
-// ---- One-directional, additive sync from Google Calendar ----
-function mapGoogleEventToLocal(item){
-  const startAllDay = item.start && item.start.date;
-  const allDay = !!startAllDay;
+// ---- One-directional, additive sync from Google Calendar (ALL calendars) ----
+// Namespacing rule: for the primary calendar we keep the raw Google event id
+// (matches what earlier syncs already stored, so nothing gets re-imported as
+// a duplicate); for every other calendar we prefix with the calendar id,
+// since event ids are only guaranteed unique within a single calendar.
+function googleEventKey(calendarId, itemId){
+  return calendarId === 'primary' ? itemId : `${calendarId}::${itemId}`;
+}
+function calendarColor(calendarId){
+  let hash = 0;
+  for(let i=0;i<calendarId.length;i++){ hash = (hash*31 + calendarId.charCodeAt(i)) >>> 0; }
+  return EVENT_COLORS[hash % EVENT_COLORS.length];
+}
+function mapGoogleEventToLocal(entry){
+  const item = entry.item;
+  const allDay = !!(item.start && item.start.date);
   const startDate = allDay ? item.start.date : (item.start.dateTime || '').slice(0,10);
   let endDate = allDay ? item.end.date : (item.end.dateTime || '').slice(0,10);
   // Google's all-day "end.date" is exclusive (the day after the event ends) —
@@ -1676,17 +1692,35 @@ function mapGoogleEventToLocal(item){
   const endTime = allDay ? null : (item.end.dateTime || '').slice(11,16);
   return {
     id: uid(),
-    googleEventId: item.id,
+    googleEventId: googleEventKey(entry.calendarId, item.id),
     title: item.summary || '(untitled event)',
     description: item.description || '',
     location: item.location || '',
     allDay, startDate, endDate,
     startTime: startTime || '09:00',
     endTime: endTime || (startTime || '10:00'),
-    color: EVENT_COLORS[0]
+    color: calendarColor(entry.calendarId),
+    calendarSummary: entry.calendarSummary || ''
   };
 }
-async function fetchGoogleCalendarEvents(){
+async function fetchGoogleCalendarList(){
+  let calendars = [];
+  let pageToken = null;
+  let pages = 0;
+  do {
+    const params = new URLSearchParams({ maxResults: '250' });
+    if(pageToken) params.set('pageToken', pageToken);
+    const res = await driveFetch(`https://www.googleapis.com/calendar/v3/users/me/calendarList?${params.toString()}`);
+    if(!res.ok) throw new Error('Calendar list fetch failed: ' + res.status);
+    const data = await res.json();
+    calendars = calendars.concat(data.items || []);
+    pageToken = data.nextPageToken || null;
+    pages++;
+  } while(pageToken && pages < 5);
+  // Calendars we only have free/busy access to can't return real event details.
+  return calendars.filter(c => c.accessRole !== 'freeBusyReader');
+}
+async function fetchEventsForCalendar(calendarId){
   const timeMin = new Date(); timeMin.setMonth(timeMin.getMonth() - 1);
   const timeMax = new Date(); timeMax.setMonth(timeMax.getMonth() + 6);
   let items = [];
@@ -1698,8 +1732,8 @@ async function fetchGoogleCalendarEvents(){
       singleEvents: 'true', orderBy: 'startTime', maxResults: '250'
     });
     if(pageToken) params.set('pageToken', pageToken);
-    const res = await driveFetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`);
-    if(!res.ok) throw new Error('Calendar fetch failed: ' + res.status);
+    const res = await driveFetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events?${params.toString()}`);
+    if(!res.ok) throw new Error(`Events fetch failed (${calendarId}): ` + res.status);
     const data = await res.json();
     items = items.concat(data.items || []);
     pageToken = data.nextPageToken || null;
@@ -1707,29 +1741,52 @@ async function fetchGoogleCalendarEvents(){
   } while(pageToken && pages < 10);
   return items;
 }
+async function fetchAllGoogleCalendarEvents(){
+  const calendars = await fetchGoogleCalendarList();
+  const entries = [];
+  let failedCalendars = 0;
+  for(const cal of calendars){
+    try{
+      const items = await fetchEventsForCalendar(cal.id);
+      items.forEach(item => entries.push({ item, calendarId: cal.id, calendarSummary: cal.summary || cal.id }));
+    }catch(e){
+      // One calendar failing (e.g. a stale shared calendar) shouldn't sink the
+      // whole sync — skip it and keep going with the rest.
+      console.warn(`Skipping calendar "${cal.summary||cal.id}":`, e);
+      failedCalendars++;
+    }
+  }
+  return { entries, calendarCount: calendars.length, failedCalendars };
+}
 async function syncGoogleCalendar(){
   if(calendarSyncing) return;
   calendarSyncing = true;
   calSyncStatusMsg = '';
   render();
   try{
-    const items = await fetchGoogleCalendarEvents();
+    const { entries, calendarCount, failedCalendars } = await fetchAllGoogleCalendarEvents();
     const knownGoogleIds = new Set(
       Object.values(state.calendarEvents).map(e => e.googleEventId).filter(Boolean)
     );
     let added = 0;
-    items.forEach(item => {
+    entries.forEach(entry => {
+      const item = entry.item;
       if(!item.id) return;
       if(item.status === 'cancelled') return;
-      if(knownGoogleIds.has(item.id)) return; // already imported — never overwrite
-      if(state.dismissedGoogleEventIds.includes(item.id)) return; // you deleted this locally before
-      const local = mapGoogleEventToLocal(item);
+      const key = googleEventKey(entry.calendarId, item.id);
+      if(knownGoogleIds.has(key)) return; // already imported — never overwrite
+      if(state.dismissedGoogleEventIds.includes(key)) return; // you deleted this locally before
+      const local = mapGoogleEventToLocal(entry);
       state.calendarEvents[local.id] = local;
-      knownGoogleIds.add(item.id);
+      knownGoogleIds.add(key);
       added++;
     });
     state.calendarSync.lastSyncedAt = new Date().toISOString();
-    calSyncStatusMsg = added > 0 ? `✓ Added ${added} new event${added!==1?'s':''} from Google Calendar` : '✓ Up to date — no new events found';
+    let msg = added > 0
+      ? `✓ Added ${added} new event${added!==1?'s':''} from ${calendarCount} calendar${calendarCount!==1?'s':''}`
+      : `✓ Up to date across ${calendarCount} calendar${calendarCount!==1?'s':''} — no new events`;
+    if(failedCalendars > 0) msg += ` (${failedCalendars} calendar${failedCalendars!==1?'s':''} skipped — no access)`;
+    calSyncStatusMsg = msg;
     saveState();
   }catch(e){
     console.error('Calendar sync failed:', e);
