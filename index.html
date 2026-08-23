@@ -240,6 +240,11 @@
   .cal-toolbar-left h2{font-family:'Space Grotesk';font-size:19px;margin:0;min-width:170px;color:var(--page-text);}
   .cal-nav-btn{background:transparent;border:1px solid var(--brass);color:var(--page-text-soft);width:30px;height:30px;border-radius:3px;font-size:13px;}
   .cal-nav-btn:hover{background:rgba(47,143,209,0.15);}
+  .cal-view-toggle{display:flex;border:1px solid var(--brass);border-radius:3px;overflow:hidden;}
+  .cal-view-toggle button{background:transparent;color:var(--page-text-soft);font-family:'JetBrains Mono';font-size:11px;padding:6px 12px;border:none;border-right:1px solid var(--brass);}
+  .cal-view-toggle button:last-child{border-right:none;}
+  .cal-view-toggle button.active{background:var(--brass);color:var(--paper-dark-2);font-weight:600;}
+  .cal-view-toggle button:hover:not(.active){background:rgba(47,143,209,0.15);}
   .cal-toolbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .cal-sync-status{font-family:'JetBrains Mono';font-size:10.5px;color:var(--page-text-soft);opacity:0.85;}
   .cal-range-setting{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:'JetBrains Mono';font-size:10.5px;color:var(--page-text-soft);margin-bottom:14px;}
@@ -263,6 +268,18 @@
   .cal-color-swatch.selected{border-color:var(--ink);}
   .cal-legend{font-family:'JetBrains Mono';font-size:10px;color:var(--ink-soft);margin-top:6px;display:inline-flex;align-items:center;gap:5px;}
   .cal-legend .dot{width:8px;height:8px;border-radius:50%;}
+  .cal-daynum{cursor:pointer;}
+  .cal-daynum:hover{background:rgba(47,143,209,0.35)!important;}
+  .cal-week-body{height:520px;}
+  .cal-day-agenda{background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:18px 20px;box-shadow:0 2px 8px rgba(0,0,0,0.28);min-height:300px;}
+  .cal-day-agenda.today{border-color:var(--brass);}
+  .cal-agenda-section-label{font-family:'JetBrains Mono';font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--brass);margin:16px 0 8px;}
+  .cal-agenda-section-label:first-child{margin-top:0;}
+  .cal-agenda-item{background:var(--paper-light);border:1px solid var(--line);border-left:4px solid var(--brass);border-radius:4px;padding:10px 14px;margin-bottom:8px;cursor:pointer;}
+  .cal-agenda-item:hover{transform:translateX(2px);}
+  .cal-agenda-time{font-family:'JetBrains Mono';font-size:10.5px;color:var(--ink-soft);margin-bottom:3px;}
+  .cal-agenda-title{font-size:14px;font-weight:600;color:var(--ink);}
+  .cal-agenda-sub{font-family:'JetBrains Mono';font-size:11px;color:var(--ink-soft);margin-top:3px;}
 
   @media (max-width:520px){
     .folder-grid{grid-template-columns:1fr 1fr;}
@@ -1472,6 +1489,8 @@ function fmtPeriod(period){
 // ---------------------------------------------------------------------
 const EVENT_COLORS = ['#2f8fd1','#22a878','#d1552f','#8860c4','#c99a2e','#4a90a4'];
 let calCursor = (() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; })();
+let calViewMode = 'month';   // 'month' | 'week' | 'day' — the current zoom level
+let calSelectedDate = todayStr(); // anchor date used by week/day views
 let eventModalCtx = null;   // {mode:'create'|'edit', id?, defaultDate?}
 let selectedEventColor = EVENT_COLORS[0];
 let calendarSyncing = false;
@@ -1529,10 +1548,62 @@ function calNextMonth(){
   render();
 }
 function calGoToday(){
-  const d = new Date(); calCursor = { year: d.getFullYear(), month: d.getMonth() };
+  const d = new Date();
+  calCursor = { year: d.getFullYear(), month: d.getMonth() };
+  calSelectedDate = todayStr();
   render();
 }
 function dstr(y,m,d){ return `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+
+// ---- view switching / zoom ----
+function switchCalView(mode){
+  calViewMode = mode;
+  render();
+}
+// Zoom in from a month/week cell straight to that day's agenda.
+function zoomToDay(dateStr){
+  calSelectedDate = dateStr;
+  calViewMode = 'day';
+  render();
+}
+// Zoom in from month view to the week containing this date.
+function zoomToWeek(dateStr){
+  calSelectedDate = dateStr;
+  calViewMode = 'week';
+  render();
+}
+function weekStartFor(dateStr){
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() - d.getDay());
+  return dstr(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function calPrevPeriod(){
+  if(calViewMode === 'month') return calPrevMonth();
+  if(calViewMode === 'week'){ calSelectedDate = addDaysStr(calSelectedDate, -7); }
+  else { calSelectedDate = addDaysStr(calSelectedDate, -1); }
+  render();
+}
+function calNextPeriod(){
+  if(calViewMode === 'month') return calNextMonth();
+  if(calViewMode === 'week'){ calSelectedDate = addDaysStr(calSelectedDate, 7); }
+  else { calSelectedDate = addDaysStr(calSelectedDate, 1); }
+  render();
+}
+function calPeriodLabel(){
+  if(calViewMode === 'month') return calMonthLabel();
+  if(calViewMode === 'day'){
+    const d = new Date(calSelectedDate + 'T00:00:00');
+    return d.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  }
+  const start = weekStartFor(calSelectedDate);
+  const end = addDaysStr(start, 6);
+  const ds = new Date(start + 'T00:00:00'), de = new Date(end + 'T00:00:00');
+  const sameMonth = ds.getMonth() === de.getMonth() && ds.getFullYear() === de.getFullYear();
+  const monthShort = (d) => d.toLocaleDateString(undefined, { month:'short' });
+  const startLabel = `${monthShort(ds)} ${ds.getDate()}`;
+  const endLabel = sameMonth ? `${de.getDate()}, ${de.getFullYear()}` : `${monthShort(de)} ${de.getDate()}, ${de.getFullYear()}`;
+  return `${startLabel} – ${endLabel}`;
+}
 function buildMonthGrid(year, month){
   const firstOfMonth = new Date(year, month, 1);
   const startOffset = firstOfMonth.getDay(); // 0=Sun
@@ -1553,6 +1624,16 @@ function buildMonthGrid(year, month){
   }
   return weeks;
 }
+function buildWeekDays(dateStr){
+  const start = weekStartFor(dateStr);
+  const d = new Date(start + 'T00:00:00');
+  const days = [];
+  for(let i=0;i<7;i++){
+    days.push({ dateStr: dstr(d.getFullYear(), d.getMonth(), d.getDate()), day: d.getDate() });
+    d.setDate(d.getDate()+1);
+  }
+  return days;
+}
 function eventsOnDate(dateStr){
   return Object.values(state.calendarEvents)
     .filter(ev => ev.startDate <= dateStr && dateStr <= ev.endDate)
@@ -1571,24 +1652,29 @@ function fmtEventTime(t){
 
 function renderScheduling(){
   const main = document.getElementById('main');
-  const weeks = buildMonthGrid(calCursor.year, calCursor.month);
   const today = todayStr();
   const lastSync = state.calendarSync && state.calendarSync.lastSyncedAt
     ? new Date(state.calendarSync.lastSyncedAt).toLocaleString()
     : 'never';
+  const newEventDate = calViewMode === 'month' ? today : calSelectedDate;
 
   let html = `<div class="cal-toolbar">
       <div class="cal-toolbar-left">
-        <button class="cal-nav-btn" onclick="calPrevMonth()">‹</button>
-        <button class="cal-nav-btn" onclick="calNextMonth()">›</button>
-        <h2>${calMonthLabel()}</h2>
+        <button class="cal-nav-btn" onclick="calPrevPeriod()">‹</button>
+        <button class="cal-nav-btn" onclick="calNextPeriod()">›</button>
+        <h2>${calPeriodLabel()}</h2>
         <button class="btn subtle small" onclick="calGoToday()">Today</button>
+        <div class="cal-view-toggle">
+          <button class="${calViewMode==='month'?'active':''}" onclick="switchCalView('month')">Month</button>
+          <button class="${calViewMode==='week'?'active':''}" onclick="switchCalView('week')">Week</button>
+          <button class="${calViewMode==='day'?'active':''}" onclick="switchCalView('day')">Day</button>
+        </div>
       </div>
       <div class="cal-toolbar-right">
         <span class="cal-sync-status">${calendarSyncing ? '⏳ Syncing…' : (calSyncStatusMsg || `Last synced: ${esc(lastSync)}`)}</span>
         <button class="btn ghost small" onclick="syncGoogleCalendar()" ${calendarSyncing?'disabled':''}>🔄 Sync from Google Calendar</button>
         <button class="btn ghost small" onclick="cleanupDuplicateEvents()">🧹 Remove duplicates</button>
-        <button class="btn small" onclick="openNewEventModal('${today}')">+ New Event</button>
+        <button class="btn small" onclick="openNewEventModal('${newEventDate}')">+ New Event</button>
       </div>
     </div>`;
 
@@ -1600,7 +1686,18 @@ function renderScheduling(){
       <span style="opacity:0.6;">· auto-syncs every time you open this tab</span>
     </div>`;
 
-  html += `<div class="cal-grid"><div class="cal-weekday-row">
+  if(calViewMode === 'month') html += renderMonthView(today);
+  else if(calViewMode === 'week') html += renderWeekView(today);
+  else html += renderDayView(today);
+
+  html += `<div class="cal-legend">🔗 = imported from Google Calendar · edits here stay local and are never sent back to Google · click a date number to zoom in</div>`;
+
+  main.innerHTML = html;
+}
+
+function renderMonthView(today){
+  const weeks = buildMonthGrid(calCursor.year, calCursor.month);
+  let html = `<div class="cal-grid"><div class="cal-weekday-row">
       <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
     </div>`;
   html += `<div class="cal-body">`;
@@ -1610,21 +1707,77 @@ function renderScheduling(){
       const shown = evs.slice(0,3);
       const extra = evs.length - shown.length;
       html += `<div class="cal-day ${cell.inMonth?'':'other-month'} ${cell.dateStr===today?'today':''}" onclick="openNewEventModal('${cell.dateStr}')">
-          <div class="cal-daynum">${cell.day}</div>
+          <div class="cal-daynum" onclick="event.stopPropagation(); zoomToDay('${cell.dateStr}')" title="View this day">${cell.day}</div>
           <div class="cal-events">`;
       shown.forEach(ev => {
         const timeLabel = ev.allDay ? '' : `<span class="cal-event-time">${fmtEventTime(ev.startTime)}</span>`;
         html += `<div class="cal-event-chip" style="background:${ev.color}" title="${esc(ev.title)}" onclick="event.stopPropagation(); openEditEventModal('${ev.id}')">${timeLabel}${esc(ev.title)}${ev.googleEventId?' 🔗':''}</div>`;
       });
-      if(extra > 0) html += `<div class="cal-more">+${extra} more</div>`;
+      if(extra > 0) html += `<div class="cal-more" onclick="event.stopPropagation(); zoomToDay('${cell.dateStr}')">+${extra} more</div>`;
       html += `</div></div>`;
     });
   });
   html += `</div></div>`;
+  return html;
+}
 
-  html += `<div class="cal-legend">🔗 = imported from Google Calendar · edits here stay local and are never sent back to Google</div>`;
+function renderWeekView(today){
+  const days = buildWeekDays(calSelectedDate);
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  let html = `<div class="cal-grid"><div class="cal-weekday-row">`;
+  days.forEach((d,i) => {
+    const dt = new Date(d.dateStr + 'T00:00:00');
+    html += `<div>${dayNames[i]} <span class="mono" style="opacity:0.7">${dt.getDate()}</span></div>`;
+  });
+  html += `</div>`;
+  html += `<div class="cal-body cal-week-body">`;
+  days.forEach(cell => {
+    const evs = eventsOnDate(cell.dateStr);
+    const shown = evs.slice(0,8);
+    const extra = evs.length - shown.length;
+    html += `<div class="cal-day ${cell.dateStr===today?'today':''}" onclick="openNewEventModal('${cell.dateStr}')">
+        <div class="cal-daynum" onclick="event.stopPropagation(); zoomToDay('${cell.dateStr}')" title="View this day">${cell.day}</div>
+        <div class="cal-events">`;
+    shown.forEach(ev => {
+      const timeLabel = ev.allDay ? '' : `<span class="cal-event-time">${fmtEventTime(ev.startTime)}</span>`;
+      html += `<div class="cal-event-chip" style="background:${ev.color}" title="${esc(ev.title)}" onclick="event.stopPropagation(); openEditEventModal('${ev.id}')">${timeLabel}${esc(ev.title)}${ev.googleEventId?' 🔗':''}</div>`;
+    });
+    if(extra > 0) html += `<div class="cal-more" onclick="event.stopPropagation(); zoomToDay('${cell.dateStr}')">+${extra} more</div>`;
+    html += `</div></div>`;
+  });
+  html += `</div></div>`;
+  return html;
+}
 
-  main.innerHTML = html;
+function renderDayView(today){
+  const evs = eventsOnDate(calSelectedDate);
+  const allDayEvs = evs.filter(e => e.allDay);
+  const timedEvs = evs.filter(e => !e.allDay);
+  let html = `<div class="cal-day-agenda ${calSelectedDate===today?'today':''}">`;
+  if(allDayEvs.length){
+    html += `<div class="cal-agenda-section-label">All day</div>`;
+    allDayEvs.forEach(ev => {
+      html += `<div class="cal-agenda-item" style="border-left-color:${ev.color}" onclick="openEditEventModal('${ev.id}')">
+          <div class="cal-agenda-title">${esc(ev.title)}${ev.googleEventId?' 🔗':''}</div>
+          ${ev.location ? `<div class="cal-agenda-sub">📍 ${esc(ev.location)}</div>` : ''}
+        </div>`;
+    });
+  }
+  if(timedEvs.length){
+    html += `<div class="cal-agenda-section-label">Schedule</div>`;
+    timedEvs.forEach(ev => {
+      html += `<div class="cal-agenda-item" style="border-left-color:${ev.color}" onclick="openEditEventModal('${ev.id}')">
+          <div class="cal-agenda-time">${fmtEventTime(ev.startTime)} – ${fmtEventTime(ev.endTime)}</div>
+          <div class="cal-agenda-title">${esc(ev.title)}${ev.googleEventId?' 🔗':''}</div>
+          ${ev.location ? `<div class="cal-agenda-sub">📍 ${esc(ev.location)}</div>` : ''}
+        </div>`;
+    });
+  }
+  if(!allDayEvs.length && !timedEvs.length){
+    html += `<div class="empty-note">Nothing scheduled for this day.</div>`;
+  }
+  html += `</div>`;
+  return html;
 }
 
 // ---- Event modal ----
