@@ -285,13 +285,21 @@
 
   /* Week/Day hour timeline */
   .cal-timegrid-wrap{background:var(--paper);border:1px solid var(--line);border-radius:6px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.28);}
+  .cal-timegrid-hscroll{overflow-x:auto;}
+  .cal-timeline-header-row{display:flex;background:rgba(47,143,209,0.1);border-bottom:1px solid var(--line);}
+  .cal-timeline-header-label-col{width:52px;flex-shrink:0;position:sticky;left:0;z-index:2;background:var(--paper);border-right:1px solid var(--line);}
+  .cal-timeline-header-col{flex:1;text-align:center;padding:8px 4px;font-family:'JetBrains Mono';font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--brass);border-right:1px solid var(--line);}
+  .cal-timeline-header-col:last-child{border-right:none;}
+  .cal-timeline-header-col.today-col{background:rgba(47,143,209,0.16);}
+  .cal-timeline-header-num{display:inline-block;margin-left:2px;cursor:pointer;font-size:12px;color:var(--ink);}
+  .cal-timeline-header-num:hover{text-decoration:underline;}
   .cal-allday-row{display:flex;border-bottom:1px solid var(--line);background:rgba(47,143,209,0.05);}
-  .cal-allday-label-col{width:52px;flex-shrink:0;font-family:'JetBrains Mono';font-size:8.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);padding:8px 4px;text-align:right;}
+  .cal-allday-label-col{width:52px;flex-shrink:0;font-family:'JetBrains Mono';font-size:8.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);padding:8px 4px;text-align:right;position:sticky;left:0;z-index:2;background:var(--paper);}
   .cal-allday-col{flex:1;border-right:1px solid var(--line);padding:5px;display:flex;flex-direction:column;gap:2px;min-height:30px;}
   .cal-allday-col:last-child{border-right:none;}
   .cal-timegrid-scroll{max-height:560px;overflow-y:auto;}
   .cal-timegrid{display:flex;position:relative;}
-  .cal-hour-labels-col{width:52px;flex-shrink:0;position:relative;border-right:1px solid var(--line);background:var(--paper);}
+  .cal-hour-labels-col{width:52px;flex-shrink:0;position:sticky;left:0;z-index:2;border-right:1px solid var(--line);background:var(--paper);}
   .cal-hour-label{position:absolute;left:0;right:6px;text-align:right;font-family:'JetBrains Mono';font-size:9px;color:var(--ink-soft);transform:translateY(-50%);}
   .cal-timegrid-cols{flex:1;display:flex;position:relative;}
   .cal-timegrid-col{flex:1;position:relative;border-right:1px solid var(--line);cursor:pointer;min-width:0;}
@@ -301,13 +309,54 @@
   .cal-timed-event{position:absolute;left:2px;right:2px;border-radius:3px;padding:2px 6px;color:#fff;font-family:'Inter';font-size:10.5px;overflow:hidden;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.3);line-height:1.3;}
   .cal-timed-event .cal-event-time{display:block;font-family:'JetBrains Mono';font-size:8.5px;opacity:0.85;}
 
-  @media (max-width:520px){
-    .folder-grid{grid-template-columns:1fr 1fr;}
+  @media (max-width:640px){
+    body{padding:16px 12px 60px;}
+    .masthead{flex-direction:column;align-items:flex-start;gap:10px;}
+    .masthead h1{font-size:21px;}
+    .header-actions{width:100%;gap:6px;}
+    .search-input{width:100%;order:1;}
+    .theme-toggle{order:2;}
+    .btn-label{display:none;}
+    .bin-btn, .sign-out-btn{padding:8px 10px;}
+    .top-tabs{margin-top:10px;}
+    .top-tab-btn{padding:8px 11px;font-size:11px;}
+
+    .folder-grid{grid-template-columns:1fr 1fr;gap:14px 10px;}
     .task-top{flex-wrap:wrap;}
-    .masthead{flex-direction:column;align-items:flex-start;}
-    .cal-day{padding:4px;}
-    .cal-body{height:auto;grid-auto-rows:minmax(64px,1fr);}
-    .cal-toolbar-left h2{min-width:0;font-size:16px;}
+    .range-controls, .list-controls{gap:12px;}
+
+    /* Modals: less wasted padding, fields easier to tap */
+    .modal-overlay{padding:0;align-items:stretch;}
+    .modal{max-width:100%;min-height:100%;border-radius:0;padding:18px 16px 28px;}
+    .field input, .field textarea, .field select{font-size:16px;} /* prevents iOS auto-zoom on focus */
+
+    /* Calendar toolbar: stack and shrink */
+    .cal-toolbar{gap:8px;}
+    .cal-toolbar-left{gap:6px;flex-wrap:wrap;}
+    .cal-toolbar-left h2{min-width:0;font-size:15px;order:-1;flex-basis:100%;}
+    .cal-view-toggle button{padding:5px 9px;font-size:10px;}
+    .cal-toolbar-right{width:100%;gap:6px;}
+    .cal-toolbar-right .btn, .cal-toolbar-right .cal-sync-status{font-size:10px;}
+    .cal-range-setting{font-size:9.5px;}
+
+    /* Month grid: tighter cells, smaller text so a week still fits one screen */
+    .cal-day{padding:3px;gap:1px;}
+    .cal-body{height:auto;grid-auto-rows:minmax(58px,1fr);}
+    .cal-daynum{width:17px;height:17px;font-size:10px;}
+    .cal-event-chip{font-size:9px;padding:1px 3px;}
+    .cal-event-chip .cal-event-time{font-size:8px;}
+    .cal-more{font-size:8.5px;}
+    .cal-weekday-row div{font-size:8.5px;padding:6px 2px;}
+
+    /* Week/Day timeline: narrower hour column, smaller event text */
+    .cal-hour-labels-col, .cal-allday-label-col, .cal-timeline-header-label-col{width:38px;}
+    .cal-hour-label{font-size:8px;}
+    .cal-timeline-header-col{font-size:8.5px;padding:6px 2px;}
+    .cal-timeline-header-num{font-size:10.5px;}
+    .cal-timegrid-scroll{max-height:440px;}
+    .cal-timed-event{font-size:9.5px;padding:1px 4px;}
+    .cal-timed-event .cal-event-time{font-size:7.5px;}
+    .cal-legend{font-size:9px;}
   }
 </style>
 </head>
@@ -331,10 +380,10 @@
       <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search tasks, sub-tasks, categories… ( / )" oninput="updateSearchQuery(this.value)">
       <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Switch theme"></button>
       <input type="file" id="importFileInput" accept="application/json" style="display:none" onchange="handleImportFile(event)">
-      <button class="bin-btn" onclick="document.getElementById('importFileInput').click()" title="Restore from a JSON backup">⬆ Import</button>
-      <button class="bin-btn" onclick="exportData()" title="Download a JSON backup">⬇ Export</button>
-      <button class="bin-btn" onclick="openTrashView()">🗑 Recycling Bin<span class="badge" id="trashBadge" style="display:none">0</span></button>
-      <button class="sign-out-btn" onclick="signOut()" title="Sign out of Google">Sign Out</button>
+      <button class="bin-btn" onclick="document.getElementById('importFileInput').click()" title="Restore from a JSON backup">⬆<span class="btn-label"> Import</span></button>
+      <button class="bin-btn" onclick="exportData()" title="Download a JSON backup">⬇<span class="btn-label"> Export</span></button>
+      <button class="bin-btn" onclick="openTrashView()" title="Recycling Bin">🗑<span class="btn-label"> Recycling Bin</span><span class="badge" id="trashBadge" style="display:none">0</span></button>
+      <button class="sign-out-btn" onclick="signOut()" title="Sign out of Google">⏻<span class="btn-label"> Sign Out</span></button>
     </div>
   </div>
   <div id="saveBadge" class="save-badge"></div>
@@ -1691,7 +1740,33 @@ function handleTimegridClick(e, dateStr){
   const h = Math.floor(totalMinutes/60), m = totalMinutes%60;
   openNewEventModal(dateStr, `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
 }
-function renderTimelineSection(columns, today){
+function renderTimelineSection(columns, today, showHeader){
+  // For a multi-column (week) view, force a comfortable minimum width per day
+  // and let the whole thing scroll horizontally on narrow screens rather than
+  // squeezing every column down to unreadable slivers. Single-column (day)
+  // view always just fills the available width. The header row (when shown)
+  // lives inside the SAME horizontally-scrolling container as the all-day
+  // strip and the hour grid below it, so all three stay aligned and scroll
+  // together as one unit instead of drifting apart on a narrow screen.
+  const minWidthStyle = columns.length > 1
+    ? `style="min-width:${52 + columns.length*84}px;"`
+    : '';
+
+  let headerHtml = '';
+  if(showHeader){
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const headerCols = columns.map(c => {
+      const dt = new Date(c.dateStr + 'T00:00:00');
+      return `<div class="cal-timeline-header-col ${c.dateStr===today?'today-col':''}">
+          ${dayNames[dt.getDay()]} <span class="cal-timeline-header-num" onclick="zoomToDay('${c.dateStr}')" title="View this day">${dt.getDate()}</span>
+        </div>`;
+    }).join('');
+    headerHtml = `<div class="cal-timeline-header-row" ${minWidthStyle}>
+        <div class="cal-timeline-header-label-col"></div>
+        ${headerCols}
+      </div>`;
+  }
+
   const allDayHtml = columns.map(c => {
     const evs = eventsOnDate(c.dateStr).filter(e => e.allDay);
     const chips = evs.map(ev =>
@@ -1721,14 +1796,17 @@ function renderTimelineSection(columns, today){
   }).join('');
 
   return `<div class="cal-timegrid-wrap">
-      <div class="cal-allday-row">
-        <div class="cal-allday-label-col">All-day</div>
-        ${allDayHtml}
-      </div>
-      <div class="cal-timegrid-scroll" id="calTimegridScroll">
-        <div class="cal-timegrid">
-          <div class="cal-hour-labels-col" style="height:${24*HOUR_HEIGHT}px">${labelsHtml}</div>
-          <div class="cal-timegrid-cols" style="height:${24*HOUR_HEIGHT}px">${colsHtml}</div>
+      <div class="cal-timegrid-hscroll">
+        ${headerHtml}
+        <div class="cal-allday-row" ${minWidthStyle}>
+          <div class="cal-allday-label-col">All-day</div>
+          ${allDayHtml}
+        </div>
+        <div class="cal-timegrid-scroll" id="calTimegridScroll">
+          <div class="cal-timegrid" ${minWidthStyle}>
+            <div class="cal-hour-labels-col" style="height:${24*HOUR_HEIGHT}px">${labelsHtml}</div>
+            <div class="cal-timegrid-cols" style="height:${24*HOUR_HEIGHT}px">${colsHtml}</div>
+          </div>
         </div>
       </div>
     </div>`;
@@ -1814,18 +1892,11 @@ function renderMonthView(today){
 
 function renderWeekView(today){
   const days = buildWeekDays(calSelectedDate);
-  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  let html = `<div class="cal-grid"><div class="cal-weekday-row">`;
-  days.forEach((d,i) => {
-    html += `<div>${dayNames[i]} <span class="mono cal-weekday-num" onclick="zoomToDay('${d.dateStr}')" title="View this day">${d.day}</span></div>`;
-  });
-  html += `</div></div>`;
-  html += renderTimelineSection(days.map(d => ({ dateStr: d.dateStr })), today);
-  return html;
+  return renderTimelineSection(days.map(d => ({ dateStr: d.dateStr })), today, true);
 }
 
 function renderDayView(today){
-  return renderTimelineSection([{ dateStr: calSelectedDate }], today);
+  return renderTimelineSection([{ dateStr: calSelectedDate }], today, false);
 }
 
 // ---- Event modal ----
