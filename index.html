@@ -790,8 +790,19 @@ function migrateState(){
 // birthday shows up both in your primary calendar's auto-birthdays AND in
 // the dedicated "Birthdays" calendar). Never touches events you created
 // yourself in this app — only ones with a googleEventId.
+//
+// For all-day events we key off title + start date only (case/whitespace
+// normalized) and deliberately ignore endDate/time fields — Google is
+// inconsistent about how it represents the "same" all-day event depending on
+// which calendar it came from (e.g. an exclusive vs inclusive end date), so
+// matching on those extra fields was letting real duplicates slip through.
+// Timed events keep the fuller fingerprint since precision matters more there.
 function eventContentKey(ev){
-  return [ev.title, ev.startDate, ev.endDate, ev.allDay, ev.startTime||'', ev.endTime||''].join('|');
+  const title = (ev.title||'').trim().toLowerCase();
+  if(ev.allDay){
+    return ['allday', title, ev.startDate].join('|');
+  }
+  return ['timed', title, ev.startDate, ev.endDate, ev.startTime||'', ev.endTime||''].join('|');
 }
 function dedupeImportedCalendarEvents(){
   const seen = new Map();
@@ -807,6 +818,12 @@ function dedupeImportedCalendarEvents(){
     }
   });
   return removed;
+}
+function cleanupDuplicateEvents(){
+  const removed = dedupeImportedCalendarEvents();
+  calSyncStatusMsg = removed > 0 ? `✓ Removed ${removed} duplicate${removed!==1?'s':''}` : 'No duplicates found';
+  if(removed > 0) saveState();
+  render();
 }
 function applyTheme(){
   const body = document.body;
@@ -1570,6 +1587,7 @@ function renderScheduling(){
       <div class="cal-toolbar-right">
         <span class="cal-sync-status">${calendarSyncing ? '⏳ Syncing…' : (calSyncStatusMsg || `Last synced: ${esc(lastSync)}`)}</span>
         <button class="btn ghost small" onclick="syncGoogleCalendar()" ${calendarSyncing?'disabled':''}>🔄 Sync from Google Calendar</button>
+        <button class="btn ghost small" onclick="cleanupDuplicateEvents()">🧹 Remove duplicates</button>
         <button class="btn small" onclick="openNewEventModal('${today}')">+ New Event</button>
       </div>
     </div>`;
