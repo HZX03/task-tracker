@@ -1900,7 +1900,13 @@ function renderBreadcrumb(){
     return;
   }
   const path = currentCategoryId ? categoryPath(currentCategoryId) : [];
-  let html = `<span class="crumb ${currentCategoryId===null?'current':''}" onclick="navigateTo(null)">🏠 Home</span>`;
+  if(currentCategoryId === null){
+    // At root there's nothing to navigate back to — the tab bar right below
+    // already shows "Home", so a lone breadcrumb pill here would just repeat it.
+    el.innerHTML = '';
+    return;
+  }
+  let html = `<span class="crumb" onclick="navigateTo(null)">🏠 Home</span>`;
   path.forEach((c,i) => {
     html += `<span class="sep">/</span><span class="crumb ${i===path.length-1?'current':''}" onclick="navigateTo('${c.id}')">${esc(c.name)}</span>`;
   });
