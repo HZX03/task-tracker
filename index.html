@@ -145,6 +145,9 @@
   .waiting-note strong{color:#8860c4;font-family:'JetBrains Mono';font-size:10px;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:3px;}
   .drag-handle{cursor:grab;color:var(--ink-soft);font-size:14px;padding:2px 2px 2px 0;user-select:none;flex-shrink:0;align-self:center;}
   .drag-handle:active{cursor:grabbing;}
+  .complete-toggle{width:20px;height:20px;border-radius:50%;border:1px solid var(--brass);background:transparent;flex-shrink:0;align-self:flex-start;margin-top:2px;padding:0;display:flex;align-items:center;justify-content:center;color:transparent;font-size:12px;line-height:1;transition:background .12s ease, color .12s ease;}
+  .complete-toggle:hover{background:rgba(47,143,209,0.18);}
+  .complete-toggle.checked{background:var(--stamp-teal);border-color:var(--stamp-teal);color:#fff;}
   .tag-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;}
   .tag-chip{font-family:'JetBrains Mono';font-size:9.5px;color:var(--brass);background:rgba(47,143,209,0.1);border:1px solid var(--brass);border-radius:10px;padding:1px 8px;}
   .task-card.ongoing{border-left-color:var(--stamp-teal);}
@@ -839,6 +842,8 @@ function ensureNodeShape(node){
   if(node.estimatedTime === undefined) node.estimatedTime = '';
   if(node.importance === undefined || node.importance === null) node.importance = 4;
   if(node.completed === undefined) node.completed = false;
+  if(node.completedAt === undefined) node.completedAt = node.completed ? (node.createdAt || null) : null;
+  if(!node.completed && node.completedAt) node.completedAt = null;
   if(node.type !== 'doby' && node.type !== 'ongoing') node.type = 'doby';
   if(!Array.isArray(node.tags)) node.tags = [];
   if(node.recurring === undefined) node.recurring = false;
@@ -1066,7 +1071,7 @@ function processRecurringTasks(){
       }
     }
     node.lastRecurrenceEnd = oldEnd;
-    if(!node.completed) node.completed = true;
+    if(!node.completed){ node.completed = true; node.completedAt = new Date().toISOString(); }
   });
   return toSpawn.length;
 }
@@ -1127,6 +1132,7 @@ function makeNode(data){
     estimatedTime: data.estimatedTime || '',
     importance: Number(data.importance) || 4,
     completed: false,
+    completedAt: null,
     children: [],
     tags: Array.isArray(data.tags) ? data.tags : [],
     recurring: !!data.recurring,
@@ -1173,6 +1179,7 @@ function toggleNodeComplete(taskId, pathIds){
   const node = getNode(taskId, pathIds);
   if(!node) return;
   node.completed = !node.completed;
+  node.completedAt = node.completed ? new Date().toISOString() : null;
   if(node.completed && node.waiting){ node.waiting = false; node.waitingNote = ''; }
   saveState(); render();
 }
@@ -2356,6 +2363,7 @@ function renderRangeItem(r){
   let dots = ''; for(let i=1;i<=7;i++){ dots += `<div class="dot ${i<=node.importance?'filled':''}"></div>`; }
   return `<div class="task-card ${isOngoing?'ongoing':''} ${node.completed?'completed':''} ${overdue?'overdue':''}" style="cursor:pointer;" onclick="navigateToNode('${r.taskId}', '${r.pathIds.join(',')}')">
       <div class="task-top">
+        <button class="complete-toggle ${node.completed?'checked':''}" title="${node.completed?'Mark as active':'Mark as complete'}" onclick="event.stopPropagation(); toggleNodeComplete('${r.taskId}', '${r.pathIds.join(',')}')">${node.completed?'✓':''}</button>
         <div class="task-main">
           <div class="task-title-row">
             <span class="task-title">${esc(node.title)}</span>
@@ -2403,9 +2411,10 @@ function renderNodeCard(taskId, pathIds){
     : `draggable="true" ondragstart="startDragChild(event, '${taskId}', '${parentPathStr}', '${node.id}')" ondragover="event.preventDefault()" ondrop="dropChild(event, '${taskId}', '${parentPathStr}', '${node.id}')"`;
 
   let html = `<div class="task-card ${isOngoing?'ongoing':''} ${node.completed?'completed':''} ${overdue?'overdue':''}" ${dragAttrs}>`;
-  if(node.completed) html += `<div class="complete-stamp">✓ COMPLETE</div>`;
+  if(node.completed) html += `<div class="complete-stamp" title="Completed ${fmtDateTime(node.completedAt)}">✓ COMPLETE</div>`;
   html += `<div class="task-top">
       <span class="drag-handle" title="Drag to reorder">⠿</span>
+      <button class="complete-toggle ${node.completed?'checked':''}" title="${node.completed?'Mark as active':'Mark as complete'}" onclick="event.stopPropagation(); toggleNodeComplete('${taskId}', '${pathIds.join(',')}')">${node.completed?'✓':''}</button>
       <div class="task-main" onclick="toggleExpand('${key}')">
         <div class="task-title-row">
           <span class="task-title">${esc(node.title)}</span>
@@ -2418,6 +2427,7 @@ function renderNodeCard(taskId, pathIds){
           <span>${isOngoing ? '⏳ ' + esc(fmtPeriod(node.period)) : '⏰ ' + fmtDateTime(node.deadline)}</span>
           <span>🕐 ${esc(node.estimatedTime || '—')}</span>
           <span>added ${fmtDateTime(node.createdAt)}</span>
+          ${node.completed ? `<span>✓ done ${fmtDateTime(node.completedAt)}</span>` : ''}
           ${subdashHtml}
         </div>
         ${renderTagChips(node.tags)}
@@ -2437,8 +2447,10 @@ function renderNodeCard(taskId, pathIds){
         <div><span>${isOngoing?'Period':'Deadline'}</span>${isOngoing ? esc(fmtPeriod(node.period)) : fmtDateTime(node.deadline)}</div>
         <div><span>Est. Time</span>${esc(node.estimatedTime||'—')}</div>
         <div><span>Importance</span>${node.importance} / 7</div>
+        ${node.completed ? `<div><span>Completed</span>${fmtDateTime(node.completedAt)}</div>` : ''}
       </div>
       <div class="task-detail-actions">
+        <button class="btn ${node.completed?'subtle':''} small" onclick="toggleNodeComplete('${taskId}', '${pathIds.join(',')}')">${node.completed?'Mark as Active':'Mark Complete'}</button>
         ${node.waiting
           ? `<button class="btn ghost small" onclick="stopWaiting('${taskId}', '${pathIds.join(',')}')">Stop Waiting</button>`
           : `<button class="btn ghost small" onclick="openWaitingModal('${taskId}', '${pathIds.join(',')}')">Mark as Waiting</button>`}
