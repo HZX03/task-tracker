@@ -496,6 +496,28 @@
   </div>
 </div>
 
+<!-- Schedule Task Modal — creates/updates a linked calendar event for a task/sub-task -->
+<div class="modal-overlay" id="scheduleModalOverlay">
+  <div class="modal">
+    <h2 id="scheduleModalTitle">Schedule Task</h2>
+    <div class="modal-sub" id="scheduleModalSub">Adds this task to your calendar as an event.</div>
+    <div class="field"><label>Date</label><input id="scheduleDate" type="date" onchange="recalcScheduleEndTime()"></div>
+    <div class="field" style="display:flex;gap:10px;">
+      <div style="flex:1;"><div class="mono" style="font-size:10px;color:var(--ink-soft);margin-bottom:4px;">Start Time</div><input id="scheduleStartTime" type="time" onchange="recalcScheduleEndTime()"></div>
+      <div style="flex:1;"><div class="mono" style="font-size:10px;color:var(--ink-soft);margin-bottom:4px;">End Time</div><input id="scheduleEndTime" type="time"></div>
+    </div>
+    <div class="mono" id="scheduleEstNote" style="font-size:11px;color:var(--ink-soft);margin:-6px 0 14px;"></div>
+    <div class="field">
+      <label>Color</label>
+      <div class="cal-color-swatches" id="scheduleColorSwatches"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="closeModal('scheduleModalOverlay')">Cancel</button>
+      <button class="btn" id="scheduleModalSubmitBtn" onclick="submitScheduleModal()">Add to Calendar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ---------------------------------------------------------------------
 // STATE
@@ -530,15 +552,31 @@ function updateNextXDays(n){ nextXDays = n; state.nextXDays = n; saveState(); re
 // ---------------------------------------------------------------------
 // COLLAPSIBLE SECTIONS (every section except Categories/Sub-Categories)
 // ---------------------------------------------------------------------
-function isSectionCollapsed(key){ return !!state.collapsedSections[key]; }
-function toggleSectionCollapse(key){
-  state.collapsedSections[key] = !state.collapsedSections[key];
+// defaultCollapsed only matters the first time a section is ever seen —
+// once the user has explicitly toggled it, that choice (in state.collapsedSections)
+// always wins. Used to make "Completed Tasks" groups start collapsed while
+// everything else keeps starting expanded, as before.
+function isSectionCollapsed(key, defaultCollapsed){
+  const v = state.collapsedSections[key];
+  return v === undefined ? !!defaultCollapsed : !!v;
+}
+function toggleSectionCollapse(key, defaultCollapsed){
+  state.collapsedSections[key] = !isSectionCollapsed(key, defaultCollapsed);
   saveState(); render();
 }
-function sectionHeader(key, title, actionsHtml){
-  const collapsed = isSectionCollapsed(key);
+function sectionHeader(key, title, actionsHtml, defaultCollapsed){
+  const collapsed = isSectionCollapsed(key, defaultCollapsed);
   return `<div class="section-title">
-      <h2 class="collapsible-title" onclick="toggleSectionCollapse('${key}')">
+      <h2 class="collapsible-title" onclick="toggleSectionCollapse('${key}', ${defaultCollapsed?'true':'false'})">
+        <span class="chevron ${collapsed?'collapsed':''}">▾</span> ${title}
+      </h2>
+      ${actionsHtml || ''}
+    </div>`;
+}
+function subsectionHeader(key, title, actionsHtml, defaultCollapsed){
+  const collapsed = isSectionCollapsed(key, defaultCollapsed);
+  return `<div class="section-title" style="margin:14px 0 6px;">
+      <h2 class="collapsible-title" style="font-size:12px;" onclick="toggleSectionCollapse('${key}', ${defaultCollapsed?'true':'false'})">
         <span class="chevron ${collapsed?'collapsed':''}">▾</span> ${title}
       </h2>
       ${actionsHtml || ''}
@@ -546,11 +584,14 @@ function sectionHeader(key, title, actionsHtml){
 }
 
 // Sort + filter state, kept independently per section.
+// Home page defaults to showing only active (not-yet-completed) tasks in
+// every section; the Status dropdown in each section still lets you switch
+// to All or Completed on demand.
 let sectionControls = {
-  overdue:  { sort: 'date', type: 'all', status: 'all' },
-  nextx:    { sort: 'date', type: 'all', status: 'all' },
-  nextweek: { sort: 'date', type: 'all', status: 'all' },
-  range:    { sort: 'date', type: 'all', status: 'all' }
+  overdue:  { sort: 'date', type: 'all', status: 'active' },
+  nextx:    { sort: 'date', type: 'all', status: 'active' },
+  nextweek: { sort: 'date', type: 'all', status: 'active' },
+  range:    { sort: 'date', type: 'all', status: 'active' }
 };
 function updateSectionControl(key, field, value){
   sectionControls[key][field] = value;
@@ -856,6 +897,7 @@ function ensureNodeShape(node){
   if(node.waiting === undefined) node.waiting = false;
   if(node.waitingNote === undefined) node.waitingNote = '';
   if(node.completed && node.waiting){ node.waiting = false; node.waitingNote = ''; }
+  if(node.linkedEventId === undefined) node.linkedEventId = null;
   node.children.forEach(ensureNodeShape);
 }
 function migrateState(){
@@ -875,6 +917,7 @@ function migrateState(){
   if(!Number.isFinite(state.calendarSyncRangeFutureMonths) || state.calendarSyncRangeFutureMonths < 0) state.calendarSyncRangeFutureMonths = 6;
   Object.values(state.calendarEvents).forEach(ensureEventShape);
   dedupeImportedCalendarEvents();
+  cleanupOrphanedEventLinks();
 }
 // Removes duplicate imported events that represent the same real-world event
 // seen through two different Google calendars (classic case: a contact's
@@ -1138,7 +1181,8 @@ function makeNode(data){
     recurring: !!data.recurring,
     order: nextOrder(),
     waiting: false,
-    waitingNote: ''
+    waitingNote: '',
+    linkedEventId: null
   };
 }
 
@@ -1233,10 +1277,23 @@ function reorderChildNode(taskId, parentPathIds, draggedId, targetId){
   saveState(); render();
 }
 
+// When a task/sub-task is trashed we leave any calendar event it was
+// scheduled as fully intact (it's still a real appointment on your
+// calendar) — we just detach the back-reference so it stops pointing at a
+// node that no longer lives at that path.
+function detachLinkedEventsForNode(node){
+  if(!node) return;
+  if(node.linkedEventId && state.calendarEvents[node.linkedEventId]){
+    const ev = state.calendarEvents[node.linkedEventId];
+    ev.sourceTaskId = null; ev.sourcePathIds = null;
+  }
+  (node.children||[]).forEach(detachLinkedEventsForNode);
+}
 function deleteNode(taskId, pathIds){
   pathIds = normPath(pathIds);
   if(pathIds.length === 0){
     if(!confirm('Move this task to the recycling bin?')) return;
+    detachLinkedEventsForNode(state.tasks[taskId]);
     const snapshot = deepClone(state.tasks[taskId]);
     state.trash.push({ id: uid(), kind:'task', deletedAt: new Date().toISOString(), payload:{ task: snapshot } });
     delete state.tasks[taskId];
@@ -1248,6 +1305,7 @@ function deleteNode(taskId, pathIds){
     if(!parent) return;
     const idx = parent.children.findIndex(c => c.id === targetId);
     if(idx === -1) return;
+    detachLinkedEventsForNode(parent.children[idx]);
     const snapshot = deepClone(parent.children[idx]);
     state.trash.push({ id: uid(), kind:'subtask', deletedAt: new Date().toISOString(), payload:{ taskId, parentPathIds, node: snapshot } });
     parent.children.splice(idx,1);
@@ -1294,6 +1352,7 @@ function editCategory(id, name, description){
 function deleteCategory(id){
   if(!confirm('Move this category — and everything tracked inside it — to the recycling bin?')) return;
   const subtree = collectCategorySubtree(id);
+  subtree.tasks.forEach(detachLinkedEventsForNode);
   state.trash.push({ id: uid(), kind:'category', deletedAt: new Date().toISOString(),
     payload: { categories: deepClone(subtree.categories), tasks: deepClone(subtree.tasks), rootName: state.categories[id].name } });
   subtree.categories.forEach(c => delete state.categories[c.id]);
@@ -1589,6 +1648,22 @@ function ensureEventShape(ev){
   }
   if(!EVENT_COLORS.includes(ev.color)) ev.color = EVENT_COLORS[0];
   if(typeof ev.calendarSummary !== 'string') ev.calendarSummary = '';
+  if(ev.sourceTaskId === undefined) ev.sourceTaskId = null;
+  if(!Array.isArray(ev.sourcePathIds)) ev.sourcePathIds = ev.sourceTaskId ? [] : null;
+}
+// Keeps the task<->calendar-event link consistent: drops a node's
+// linkedEventId if that event no longer exists, and drops an event's back-
+// reference to a task if that task/sub-task no longer exists. Never deletes
+// either side — an orphaned event just becomes a normal standalone event.
+function cleanupOrphanedEventLinks(){
+  forEachNode((taskId, node) => {
+    if(node.linkedEventId && !state.calendarEvents[node.linkedEventId]) node.linkedEventId = null;
+  });
+  Object.values(state.calendarEvents).forEach(ev => {
+    if(!ev.sourceTaskId) return;
+    const n = getNode(ev.sourceTaskId, ev.sourcePathIds || []);
+    if(!n || n.linkedEventId !== ev.id){ ev.sourceTaskId = null; ev.sourcePathIds = null; }
+  });
 }
 
 function switchTopTab(tab){
@@ -2009,10 +2084,141 @@ function deleteEventFromModal(){
     // Remember this so a future sync doesn't just re-add the event you deleted.
     state.dismissedGoogleEventIds.push(ev.googleEventId);
   }
+  if(ev.sourceTaskId){
+    const srcNode = getNode(ev.sourceTaskId, ev.sourcePathIds || []);
+    if(srcNode && srcNode.linkedEventId === ev.id) srcNode.linkedEventId = null;
+  }
   delete state.calendarEvents[eventModalCtx.id];
   eventModalCtx = null;
   saveState();
   closeModal('eventModalOverlay');
+  render();
+}
+
+// ---------------------------------------------------------------------
+// SCHEDULE TASK → CALENDAR
+// Links a task/sub-task to a calendar event (state.calendarEvents), stored
+// via node.linkedEventId <-> event.sourceTaskId/sourcePathIds. Re-opening
+// the modal on an already-scheduled task edits that same event in place;
+// "Remove from Calendar" deletes only the event, never the task.
+// ---------------------------------------------------------------------
+let scheduleModalCtx = null; // {taskId, pathIds}
+let selectedScheduleColor = EVENT_COLORS[0];
+
+// Parses free-text "Estimated Time Required" values into a whole number of
+// minutes, or null if it can't confidently parse one. Understands things
+// like "2 hours", "1.5h", "90 min", "1h 30m", "45m", "2 days", "1:30", and a
+// bare number (treated as minutes).
+function parseEstimatedMinutes(text){
+  if(!text) return null;
+  const s = String(text).trim().toLowerCase();
+  if(!s) return null;
+  let m = s.match(/^(\d+):([0-5]\d)$/);
+  if(m) return parseInt(m[1],10)*60 + parseInt(m[2],10);
+  let total = 0, matched = false;
+  m = s.match(/(\d+(?:\.\d+)?)\s*(?:d|day|days)\b/);
+  if(m){ total += parseFloat(m[1]) * 24 * 60; matched = true; }
+  m = s.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/);
+  if(m){ total += parseFloat(m[1]) * 60; matched = true; }
+  m = s.match(/(\d+(?:\.\d+)?)\s*(?:m|min|mins|minute|minutes)\b/);
+  if(m){ total += parseFloat(m[1]); matched = true; }
+  if(matched) return Math.max(1, Math.round(total));
+  m = s.match(/^(\d+(?:\.\d+)?)$/);
+  if(m) return Math.max(1, Math.round(parseFloat(m[1])));
+  return null;
+}
+function openScheduleModal(taskId, pathIds){
+  pathIds = normPath(pathIds);
+  const node = getNode(taskId, pathIds);
+  if(!node) return;
+  scheduleModalCtx = { taskId, pathIds };
+  const existing = node.linkedEventId ? state.calendarEvents[node.linkedEventId] : null;
+
+  document.getElementById('scheduleModalTitle').textContent = existing ? 'Reschedule Task' : 'Schedule Task';
+  document.getElementById('scheduleModalSub').textContent = `"${node.title}" — ${existing ? 'update its calendar event.' : 'add it to your calendar as an event.'}`;
+  document.getElementById('scheduleModalSubmitBtn').textContent = existing ? 'Save Changes' : 'Add to Calendar';
+
+  let defaultDate = todayStr();
+  if(node.type === 'doby' && node.deadline) defaultDate = node.deadline.slice(0,10);
+  else if(node.type === 'ongoing' && node.period && node.period.start) defaultDate = node.period.start;
+
+  document.getElementById('scheduleDate').value = existing ? existing.startDate : defaultDate;
+  document.getElementById('scheduleStartTime').value = existing ? (existing.startTime || '09:00') : '09:00';
+  document.getElementById('scheduleEndTime').value = existing ? (existing.endTime || '10:00') : '';
+
+  const mins = parseEstimatedMinutes(node.estimatedTime);
+  const note = document.getElementById('scheduleEstNote');
+  if(mins){
+    const hrs = Math.round((mins/60)*10)/10;
+    note.textContent = `Estimated time "${node.estimatedTime}" → end time auto-calculated (${hrs} hr). You can still adjust it.`;
+  } else if(node.estimatedTime){
+    note.textContent = `Couldn't read "${node.estimatedTime}" as a duration — set an end time manually.`;
+  } else {
+    note.textContent = 'No estimated time set on this task — set an end time manually.';
+  }
+
+  selectedScheduleColor = existing ? existing.color : EVENT_COLORS[0];
+  renderScheduleColorSwatches();
+  if(!existing) recalcScheduleEndTime();
+  openModal('scheduleModalOverlay');
+}
+// If the task has a parseable estimated duration, keep End Time in lock-step
+// with Start Time (and Date, in case it rolls past midnight) automatically.
+function recalcScheduleEndTime(){
+  if(!scheduleModalCtx) return;
+  const node = getNode(scheduleModalCtx.taskId, scheduleModalCtx.pathIds);
+  if(!node) return;
+  const mins = parseEstimatedMinutes(node.estimatedTime);
+  if(!mins) return;
+  const startTime = document.getElementById('scheduleStartTime').value || '09:00';
+  const endMin = Math.min(23*60+59, timeToMinutes(startTime) + mins);
+  document.getElementById('scheduleEndTime').value = `${String(Math.floor(endMin/60)).padStart(2,'0')}:${String(endMin%60).padStart(2,'0')}`;
+}
+function renderScheduleColorSwatches(){
+  const wrap = document.getElementById('scheduleColorSwatches');
+  wrap.innerHTML = EVENT_COLORS.map(c =>
+    `<div class="cal-color-swatch ${c===selectedScheduleColor?'selected':''}" style="background:${c}" onclick="selectScheduleColor('${c}')"></div>`
+  ).join('');
+}
+function selectScheduleColor(c){ selectedScheduleColor = c; renderScheduleColorSwatches(); }
+function submitScheduleModal(){
+  if(!scheduleModalCtx) return;
+  const node = getNode(scheduleModalCtx.taskId, scheduleModalCtx.pathIds);
+  if(!node) return;
+  const date = document.getElementById('scheduleDate').value || todayStr();
+  const startTime = document.getElementById('scheduleStartTime').value || '09:00';
+  let endTime = document.getElementById('scheduleEndTime').value || startTime;
+  if(timeToMinutes(endTime) < timeToMinutes(startTime)) endTime = startTime;
+
+  const existing = node.linkedEventId ? state.calendarEvents[node.linkedEventId] : null;
+  if(existing){
+    Object.assign(existing, {
+      title: node.title, description: node.description, allDay: false,
+      startDate: date, endDate: date, startTime, endTime, color: selectedScheduleColor
+    });
+  } else {
+    const ev = {
+      id: uid(), googleEventId: null, title: node.title, description: node.description, location: '',
+      allDay: false, startDate: date, endDate: date, startTime, endTime, color: selectedScheduleColor,
+      sourceTaskId: scheduleModalCtx.taskId, sourcePathIds: [...scheduleModalCtx.pathIds]
+    };
+    state.calendarEvents[ev.id] = ev;
+    node.linkedEventId = ev.id;
+  }
+  scheduleModalCtx = null;
+  saveState();
+  closeModal('scheduleModalOverlay');
+  render();
+}
+// Removes the calendar event only — the task/sub-task itself is untouched.
+function removeTaskFromCalendar(taskId, pathIds){
+  pathIds = normPath(pathIds);
+  const node = getNode(taskId, pathIds);
+  if(!node || !node.linkedEventId) return;
+  if(!confirm('Remove this task from the calendar? The task itself will stay right where it is.')) return;
+  delete state.calendarEvents[node.linkedEventId];
+  node.linkedEventId = null;
+  saveState();
   render();
 }
 
@@ -2229,16 +2435,39 @@ function renderMain(){
   }
 
   if(currentCategoryId !== null){
-    const tasksKey = 'tasks:' + currentCategoryId;
-    html += sectionHeader(tasksKey, 'Tasks', `<button class="btn small" onclick="openNewTaskModal()">+ New Task</button>`);
-    if(!isSectionCollapsed(tasksKey)){
-      if(tasks.length === 0){
-        html += `<div class="empty-note">No tasks tracked in this category yet.</div>`;
-      } else {
-        const sorted = [...tasks].sort((a,b) => (a.order ?? 0) - (b.order ?? 0));
-        html += `<div class="task-list">`;
-        sorted.forEach(t => { html += renderNodeCard(t.id, []); });
-        html += `</div>`;
+    if(tasks.length === 0){
+      html += `<div class="section-title"><h2>Tasks</h2><button class="btn small" onclick="openNewTaskModal()">+ New Task</button></div>`;
+      html += `<div class="empty-note">No tasks tracked in this category yet.</div>`;
+    } else {
+      const byOrder = (a,b) => (a.order ?? 0) - (b.order ?? 0);
+      const activeTasks = tasks.filter(t => !t.completed).sort(byOrder);
+      const completedTasks = tasks.filter(t => t.completed).sort(byOrder);
+
+      const activeKey = 'tasks-active:' + currentCategoryId;
+      html += sectionHeader(activeKey, `Active Tasks (${activeTasks.length})`, `<button class="btn small" onclick="openNewTaskModal()">+ New Task</button>`);
+      if(!isSectionCollapsed(activeKey)){
+        if(activeTasks.length === 0){
+          html += `<div class="empty-note">No active tasks — everything here is complete. 🎉</div>`;
+        } else {
+          html += `<div class="task-list">`;
+          activeTasks.forEach(t => { html += renderNodeCard(t.id, []); });
+          html += `</div>`;
+        }
+      }
+
+      // Completed Tasks auto-collapses the first time it's ever shown, so
+      // finished work doesn't crowd out what's still active — expand it any
+      // time by clicking the header.
+      const completedKey = 'tasks-completed:' + currentCategoryId;
+      html += sectionHeader(completedKey, `✓ Completed Tasks (${completedTasks.length})`, '', true);
+      if(!isSectionCollapsed(completedKey, true)){
+        if(completedTasks.length === 0){
+          html += `<div class="empty-note">Nothing completed yet.</div>`;
+        } else {
+          html += `<div class="task-list">`;
+          completedTasks.forEach(t => { html += renderNodeCard(t.id, []); });
+          html += `</div>`;
+        }
       }
     }
   }
@@ -2360,6 +2589,7 @@ function renderRangeItem(r){
   if(!topTask) return '';
   const catPath = categoryPath(topTask.categoryId).map(c => c.name).join(' / ') || '—';
   const overdue = isOverdue(node);
+  const linkedEvent = node.linkedEventId ? state.calendarEvents[node.linkedEventId] : null;
   let dots = ''; for(let i=1;i<=7;i++){ dots += `<div class="dot ${i<=node.importance?'filled':''}"></div>`; }
   return `<div class="task-card ${isOngoing?'ongoing':''} ${node.completed?'completed':''} ${overdue?'overdue':''}" style="cursor:pointer;" onclick="navigateToNode('${r.taskId}', '${r.pathIds.join(',')}')">
       <div class="task-top">
@@ -2372,6 +2602,7 @@ function renderRangeItem(r){
             ${node.waiting ? `<span class="tag waiting-tag">Waiting</span>` : ''}
             ${node.recurring ? `<span title="Repeats automatically">🔁</span>` : ''}
             ${isSub ? `<span class="tag" style="border-color:var(--ink-soft);color:var(--ink-soft);">Sub-task</span>` : ''}
+            ${linkedEvent ? `<span class="tag" style="border-color:var(--brass);color:var(--brass-light);" title="Scheduled ${esc(fmtDate(linkedEvent.startDate))}${linkedEvent.startTime?' '+esc(fmtEventTime(linkedEvent.startTime)):''}">📅 Scheduled</span>` : ''}
           </div>
           <div class="task-meta">
             <span>📁 ${esc(catPath)}${isSub ? ' → ' + esc(topTask.title) : ''}</span>
@@ -2379,6 +2610,7 @@ function renderRangeItem(r){
           </div>
           ${renderTagChips(node.tags)}
         </div>
+        <button class="btn ${linkedEvent?'':'ghost'} small" style="padding:6px 8px;flex-shrink:0;" title="${linkedEvent?'Reschedule on calendar':'Add to calendar'}" onclick="event.stopPropagation(); openScheduleModal('${r.taskId}', '${r.pathIds.join(',')}')">📅</button>
         <div class="stamp-wrap"><div class="stamp-num">${node.importance}</div><div class="dots">${dots}</div></div>
       </div>
     </div>`;
@@ -2392,6 +2624,7 @@ function renderNodeCard(taskId, pathIds){
   const key = nodeKey(taskId, pathIds);
   const expanded = expandedNodes.has(key);
   const overdue = isOverdue(node);
+  const linkedEvent = node.linkedEventId ? state.calendarEvents[node.linkedEventId] : null;
 
   let dots = '';
   for(let i=1;i<=7;i++){ dots += `<div class="dot ${i<=node.importance?'filled':''}"></div>`; }
@@ -2422,12 +2655,14 @@ function renderNodeCard(taskId, pathIds){
           ${overdue ? `<span class="tag overdue-tag">Overdue</span>` : ''}
           ${node.waiting ? `<span class="tag waiting-tag">Waiting</span>` : ''}
           ${node.recurring ? `<span title="Repeats automatically">🔁</span>` : ''}
+          ${linkedEvent ? `<span class="tag" style="border-color:var(--brass);color:var(--brass-light);">📅 Scheduled</span>` : ''}
         </div>
         <div class="task-meta">
           <span>${isOngoing ? '⏳ ' + esc(fmtPeriod(node.period)) : '⏰ ' + fmtDateTime(node.deadline)}</span>
           <span>🕐 ${esc(node.estimatedTime || '—')}</span>
           <span>added ${fmtDateTime(node.createdAt)}</span>
           ${node.completed ? `<span>✓ done ${fmtDateTime(node.completedAt)}</span>` : ''}
+          ${linkedEvent ? `<span>📅 ${esc(fmtDate(linkedEvent.startDate))}${linkedEvent.allDay ? '' : ' ' + esc(fmtEventTime(linkedEvent.startTime)) + '–' + esc(fmtEventTime(linkedEvent.endTime))}</span>` : ''}
           ${subdashHtml}
         </div>
         ${renderTagChips(node.tags)}
@@ -2448,12 +2683,15 @@ function renderNodeCard(taskId, pathIds){
         <div><span>Est. Time</span>${esc(node.estimatedTime||'—')}</div>
         <div><span>Importance</span>${node.importance} / 7</div>
         ${node.completed ? `<div><span>Completed</span>${fmtDateTime(node.completedAt)}</div>` : ''}
+        ${linkedEvent ? `<div><span>Scheduled</span>${esc(fmtDate(linkedEvent.startDate))}${linkedEvent.allDay ? ' (all day)' : ' · ' + esc(fmtEventTime(linkedEvent.startTime)) + ' – ' + esc(fmtEventTime(linkedEvent.endTime))}</div>` : ''}
       </div>
       <div class="task-detail-actions">
         <button class="btn ${node.completed?'subtle':''} small" onclick="toggleNodeComplete('${taskId}', '${pathIds.join(',')}')">${node.completed?'Mark as Active':'Mark Complete'}</button>
         ${node.waiting
           ? `<button class="btn ghost small" onclick="stopWaiting('${taskId}', '${pathIds.join(',')}')">Stop Waiting</button>`
           : `<button class="btn ghost small" onclick="openWaitingModal('${taskId}', '${pathIds.join(',')}')">Mark as Waiting</button>`}
+        <button class="btn ghost small" onclick="openScheduleModal('${taskId}', '${pathIds.join(',')}')">📅 ${linkedEvent?'Reschedule':'Schedule'}</button>
+        ${linkedEvent ? `<button class="btn subtle small" onclick="removeTaskFromCalendar('${taskId}', '${pathIds.join(',')}')">Remove from Calendar</button>` : ''}
         <button class="btn subtle small" onclick="openEditNodeModal('${taskId}', '${pathIds.join(',')}')">Edit</button>
         <button class="btn danger small" onclick="deleteNode('${taskId}', '${pathIds.join(',')}')">Delete</button>
       </div>`;
@@ -2465,9 +2703,32 @@ function renderNodeCard(taskId, pathIds){
     if(!node.children || node.children.length === 0){
       html += `<div class="empty-note" style="padding:4px 2px;">No sub-tasks yet.</div>`;
     } else {
-      html += `<div class="children-list">`;
-      node.children.forEach(child => { html += renderNodeCard(taskId, [...pathIds, child.id]); });
-      html += `</div>`;
+      const activeChildren = node.children.filter(c => !c.completed);
+      const completedChildren = node.children.filter(c => c.completed);
+
+      const childActiveKey = 'children-active:' + key;
+      html += subsectionHeader(childActiveKey, `Active Sub-Tasks (${activeChildren.length})`);
+      if(!isSectionCollapsed(childActiveKey)){
+        if(activeChildren.length === 0){
+          html += `<div class="empty-note" style="padding:4px 2px;">No active sub-tasks.</div>`;
+        } else {
+          html += `<div class="children-list">`;
+          activeChildren.forEach(child => { html += renderNodeCard(taskId, [...pathIds, child.id]); });
+          html += `</div>`;
+        }
+      }
+
+      const childCompletedKey = 'children-completed:' + key;
+      html += subsectionHeader(childCompletedKey, `✓ Completed Sub-Tasks (${completedChildren.length})`, '', true);
+      if(!isSectionCollapsed(childCompletedKey, true)){
+        if(completedChildren.length === 0){
+          html += `<div class="empty-note" style="padding:4px 2px;">No completed sub-tasks yet.</div>`;
+        } else {
+          html += `<div class="children-list">`;
+          completedChildren.forEach(child => { html += renderNodeCard(taskId, [...pathIds, child.id]); });
+          html += `</div>`;
+        }
+      }
     }
     html += `</div>`;
   }
